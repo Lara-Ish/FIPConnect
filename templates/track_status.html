@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Booking Status | FIPConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- ===== Navigation — STRICTLY two links upper-right ===== -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo-accent">FIP</span>Connect
+        </div>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('index') }}">Home</a></li>
+            <li><a href="{{ url_for('login') }}">FIP Team</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <!-- Back Button -->
+        <a href="{{ url_for('index') }}" class="btn-back">&larr; Back</a>
+
+        <h2 class="section-title">Track Your Booking Status</h2>
+        <p class="section-subtitle">Enter the tracking code you received after submitting your inquiry.</p>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Search Form -->
+        <div class="form-card compact">
+            <form method="POST" action="{{ url_for('track_status') }}">
+                <div class="form-row center-row">
+                    <div class="form-group">
+                        <label for="tracking_code">Tracking Code</label>
+                        <input type="text" id="tracking_code" name="tracking_code"
+                               placeholder="e.g. FIP-A3F9B2" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-inline">Search</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Result Card -->
+        {% if inquiry %}
+        <div class="result-card">
+            <h3>Inquiry Details</h3>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Tracking Code</span>
+                    <span class="detail-value">{{ inquiry.tracking_code }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Client Name</span>
+                    <span class="detail-value">{{ inquiry.client_name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Event Type</span>
+                    <span class="detail-value">{{ inquiry.event_type }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Event Date</span>
+                    <span class="detail-value">{{ inquiry.event_date }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Event Time</span>
+                    <span class="detail-value">{{ inquiry.event_time }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Venue</span>
+                    <span class="detail-value">{{ inquiry.venue }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Guests</span>
+                    <span class="detail-value">{{ inquiry.guest_count }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <span class="status-badge status-{{ inquiry.status | lower }}">
+                        {{ inquiry.status }}
+                    </span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Submitted</span>
+                    <span class="detail-value">{{ inquiry.created_at }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Last Updated</span>
+                    <span class="detail-value">{{ inquiry.updated_at }}</span>
+                </div>
+            </div>
+            {% if inquiry.details %}
+            <div class="detail-notes">
+                <span class="detail-label">Additional Details</span>
+                <p>{{ inquiry.details }}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% elif searched %}
+        <div class="empty-state">
+            <div class="empty-icon">&#128533;</div>
+            <p>No inquiry found. Please double-check your tracking code and try again.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Flare Infinity Productions &mdash; FIPConnect v1.0</p>
+    </footer>
+
+</body>
+</html>

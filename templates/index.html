@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIPConnect | Flare Infinity Productions</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- ===== Navigation — STRICTLY two links upper-right ===== -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo-accent">FIP</span>Connect
+        </div>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('index') }}" class="active">Home</a></li>
+            <li><a href="{{ url_for('login') }}">FIP Team</a></li>
+        </ul>
+    </nav>
+
+    <!-- ===== Hero Section ===== -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1><span class="logo-accent">Flare Infinity</span> Productions</h1>
+            <p class="tagline">Your vision. Our production. One unforgettable event.</p>
+        </div>
+    </section>
+
+    <!-- ===== About FIP Section ===== -->
+    <section class="about-fip">
+        <h2>Flare Infinity Productions</h2>
+        <hr class="accent-divider">
+        <p>Flare Infinity Productions is a premier event management and production agency dedicated to bringing your vision to life. With years of industry expertise, we specialize in delivering seamless, high-quality audio, visual, and staging solutions. Our commitment is to craft unforgettable experiences tailored specifically to your unique needs.</p>
+    </section>
+
+    <!-- ===== Main Choice Cards ===== -->
+    <main class="container">
+        
+        <!-- Flash messages integration (for Logout notifications, etc.) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <h2 class="section-title">How can we help you today?</h2>
+
+        <div class="card-row">
+            <!-- Card 1 — Submit Inquiry -->
+            <a href="{{ url_for('inquiry_form') }}" class="choice-card">
+                <div class="card-icon">&#9997;</div>
+                <h3>Submit an Event Request</h3>
+                <p>Tell us about your upcoming event and our team will get back to you with availability and options.</p>
+                <span class="btn btn-primary">Get Started &rarr;</span>
+            </a>
+
+            <!-- Card 2 — Track Status -->
+            <a href="{{ url_for('track_status') }}" class="choice-card">
+                <div class="card-icon">&#128269;</div>
+                <h3>Check Booking Status</h3>
+                <p>Already submitted a request? Enter your tracking code to see if your event has been approved.</p>
+                <span class="btn btn-outline">Track Now &rarr;</span>
+            </a>
+        </div>
+    </main>
+
+    <!-- ===== Footer ===== -->
+    <footer class="footer">
+        <p>&copy; 2026 Flare Infinity Productions &mdash; FIPConnect v1.0</p>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,126 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Analytics | FIPConnect{% endblock %}
+
+{% block head %}
+    <!-- Chart.js CDN for visual analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+        <div class="central-analytics-container">
+            
+            <!-- 1. Page Header Section -->
+            <div class="analytics-header">
+                <div class="header-titles">
+                    <h1 class="analytics-title">Event Inquiry Analytics</h1>
+                    <p class="analytics-subtitle">Descriptive summaries from the inquiry records stored in this prototype.</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-refresh">Refresh</button>
+                </div>
+            </div>
+
+            <!-- 2. KPI Summary Cards (4-Column Grid) -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-label">Total Inquiries</span>
+                    <span class="kpi-value">{{ kpis.total }}</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Approved</span>
+                    <span class="kpi-value">{{ kpis.approved }}</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Conversion Rate</span>
+                    <span class="kpi-value">{{ kpis.conversion_rate }}</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Proposed Revenue</span>
+                    <span class="kpi-value">{{ kpis.proposed_revenue }}</span>
+                </div>
+            </div>
+
+            <!-- 3. Detailed Metrics (2-Column Grid) -->
+            <div class="metrics-grid">
+                <!-- Left Card: Inquiry Status -->
+                <div class="metrics-card">
+                    <h3>Inquiry Status</h3>
+                    {% for status, count in status_counts.items() %}
+                    <div class="progress-row">
+                        <span class="prog-label">{{ status }}</span>
+                        <div class="prog-track">
+                            <div class="prog-fill {% if count > 0 %}red{% endif %}" style="width: {{ (count / (kpis.total or 1)) * 100 }}%;"></div>
+                        </div>
+                        <span class="prog-val">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Right Card: Basic Service Needs -->
+                <div class="metrics-card">
+                    <h3>Basic Service Needs</h3>
+                    {% for service, count in services.items() %}
+                    <div class="progress-row">
+                        <span class="prog-label">{{ service }}</span>
+                        <div class="prog-track">
+                            <div class="prog-fill {% if count > 0 %}red{% endif %}" style="width: {{ (count / (kpis.total or 1)) * 100 }}%;"></div>
+                        </div>
+                        <span class="prog-val">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 4. Monthly Chart (Full Width) -->
+            <div class="chart-card">
+                <h3>Monthly Event Requests</h3>
+                <div class="chart-wrapper">
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- Script for Charts -->
+    <script>
+        // Initialize Chart.js Graph
+        window.onload = function() {
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: {{ months | tojson }},
+                    datasets: [{
+                        data: {{ monthly_data | tojson }},
+                        backgroundColor: '#8B0000',
+                        barPercentage: 0.5,
+                        categoryPercentage: 0.8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false } // Hides dataset label
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false }, // Hides vertical grid lines
+                            border: { display: true, color: '#8B0000', width: 2 }, // Crimson bottom border
+                            ticks: { font: { size: 10 }, color: '#666' }
+                        },
+                        y: {
+                            display: false, // Hides the Y-axis entirely per minimalist requirement
+                            beginAtZero: true,
+                            suggestedMax: 3 // Adds breathing room above the tallest bar
+                        }
+                    }
+                }
+            });
+        };
+    </script>
+{% endblock %}

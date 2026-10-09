@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin | FIPConnect{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="admin-body">
+
+    <div class="admin-wrapper">
+        <!-- ===== SIDEBAR ===== -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <h2><span class="logo-accent">FIP</span><span class="sidebar-text"> Admin</span></h2>
+                </div>
+                <button class="toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">&#9776;</button>
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li>
+                    <a href="{{ url_for('admin_dashboard') }}" class="{% if active_tab == 'dashboard' %}active{% endif %}" title="Dashboard">
+                        <span class="sidebar-icon">&#127968;</span>
+                        <span class="sidebar-text">Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_inquiries') }}" class="{% if active_tab == 'inquiries' %}active{% endif %}" title="Inquiries">
+                        <span class="sidebar-icon">&#128203;</span>
+                        <span class="sidebar-text">Inquiries</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_analytics') }}" class="{% if active_tab == 'analytics' %}active{% endif %}" title="Analytics">
+                        <span class="sidebar-icon">&#128200;</span>
+                        <span class="sidebar-text">Analytics</span>
+                    </a>
+                </li>
+                <!-- Settings Dropdown -->
+                <li style="margin-top: auto;">
+                    <div class="settings-menu" style="display: block;">
+                        <a href="javascript:void(0)" class="gear-icon" onclick="toggleDropdown()" title="Settings" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
+                            <span class="sidebar-icon">&#9881;</span>
+                            <span class="sidebar-text">Settings</span>
+                        </a>
+                        <div class="dropdown-content" id="settingsDropdown">
+                            <a href="{{ url_for('logout') }}">&#9211; Logout</a>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- ===== MAIN CONTENT ===== -->
+        <main class="admin-main">
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Scripts for Sidebar & Dropdown -->
+    <script>
+        function toggleSidebar() {
+            document.getElementById("sidebar").classList.toggle("collapsed");
+        }
+
+        function toggleDropdown() {
+            document.getElementById("settingsDropdown").classList.toggle("show");
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.closest('.gear-icon')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

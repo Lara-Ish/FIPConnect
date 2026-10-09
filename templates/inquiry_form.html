@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Event Inquiry | FIPConnect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- ===== Navigation — STRICTLY two links upper-right ===== -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo-accent">FIP</span>Connect
+        </div>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('index') }}">Home</a></li>
+            <li><a href="{{ url_for('login') }}">FIP Team</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <!-- Back Button -->
+        <a href="{{ url_for('index') }}" class="btn-back">&larr; Back</a>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="form-container">
+            <!-- 1. Header Section -->
+            <div class="form-header">
+                <h1 class="form-title">Basic Event Inquiry</h1>
+                <p class="form-subtitle">No account or password is needed.</p>
+            </div>
+
+            <!-- Ensure your form action points to the correct Flask route -->
+            <form action="{{ url_for('inquiry_form') }}" method="POST">
+                
+                <!-- Hidden input to prevent backend validation errors for your existing setup -->
+                <input type="hidden" name="event_time" value="00:00">
+
+                <!-- 2. Your Basic Information -->
+                <div class="form-section">
+                    <h2 class="form-section-title">Your Basic Information</h2>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Full Name *</label>
+                            <input type="text" name="client_name" class="form-control" placeholder="Juan Dela Cruz" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Email Address *</label>
+                            <input type="email" name="email" class="form-control" placeholder="you@email.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Number *</label>
+                            <input type="text" name="phone" class="form-control" placeholder="09XXXXXXXXX" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Organization / Company</label>
+                            <input type="text" name="organization" class="form-control" placeholder="Optional">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Basic Event Information -->
+                <div class="form-section">
+                    <h2 class="form-section-title">Basic Event Information</h2>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Event Type *</label>
+                            <select name="event_type" class="form-control" required>
+                                <option value="" disabled selected>Select an event type...</option>
+                                <option value="Wedding">Wedding</option>
+                                <option value="Corporate">Corporate Event</option>
+                                <option value="Birthday">Birthday / Debut</option>
+                                <option value="Concert">Concert / Gig</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Event Date *</label>
+                            <input type="date" name="event_date" id="event_date" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Event Location / Venue *</label>
+                            <input type="text" name="venue" class="form-control" placeholder="Venue / City / Location" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Event Duration</label>
+                            <input type="text" name="duration" class="form-control" placeholder="e.g. 5 hours">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Estimated Guests</label>
+                            <input type="number" name="guest_count" class="form-control" placeholder="e.g. 100">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Estimated Budget</label>
+                            <input type="text" name="budget" class="form-control" placeholder="₱">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. What Do You Need? -->
+                <div class="form-section">
+                    <h2 class="form-section-title">What Do You Need?</h2>
+                    <span class="checkbox-subtitle">Select only the services you currently need. You can provide quantities later after FIP approves your inquiry.</span>
+                    <div class="checkbox-grid">
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="Host / Emcee">
+                            <span class="checkbox-label">Host / Emcee</span>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="Sounds">
+                            <span class="checkbox-label">Sounds</span>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="Lights">
+                            <span class="checkbox-label">Lights</span>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="Stage">
+                            <span class="checkbox-label">Stage</span>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="Tables & Chairs">
+                            <span class="checkbox-label">Tables & Chairs</span>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="Manpower">
+                            <span class="checkbox-label">Manpower</span>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="LED Wall">
+                            <span class="checkbox-label">LED Wall</span>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="services" value="Other">
+                            <span class="checkbox-label">Other</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 5. Other Basic Requirements -->
+                <div class="form-section" style="margin-bottom: 2rem;">
+                    <h2 class="form-section-title">Other Basic Requirements</h2>
+                    <div class="form-group">
+                        <textarea name="details" class="form-control textarea-large" placeholder="Tell FIP briefly what you need for your event..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 6. Submit Button -->
+                <button type="submit" class="btn-submit">Submit Inquiry to FIP</button>
+            </form>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Flare Infinity Productions &mdash; FIPConnect v1.0</p>
+    </footer>
+
+    <!-- JS for Date Validation (7-Day Lead Time) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var dateInput = document.getElementById('event_date');
+            if (dateInput) {
+                var today = new Date();
+                // Add 7 days to today
+                today.setDate(today.getDate() + 7);
+                
+                var dd = String(today.getDate()).padStart(2, '0');
+                var mm = String(today.getMonth() + 1).padStart(2, '0'); // January is 0!
+                var yyyy = today.getFullYear();
+                
+                var minDate = yyyy + '-' + mm + '-' + dd;
+                dateInput.setAttribute('min', minDate);
+            }
+        });
+    </script>
+</body>
+</html>

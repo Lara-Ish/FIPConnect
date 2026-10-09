@@ -1,0 +1,137 @@
+{% extends "admin_base.html" %}
+
+{% block content %}
+            <!-- ============================================================ -->
+            <!--  TAB: OVERVIEW DASHBOARD                                     -->
+            <!-- ============================================================ -->
+            {% if active_tab == 'dashboard' %}
+            
+            <h2 class="section-title" style="text-align: left;">Admin Overview</h2>
+            <p class="section-subtitle" style="text-align: left;">High-level business metrics. Click any card to see visual analytics.</p>
+
+            <!-- Clickable KPI Cards -->
+            <div class="kpi-row">
+                <a href="{{ url_for('admin_analytics') }}" class="kpi-card">
+                    <div class="kpi-value">{{ status_counts.total }}</div>
+                    <div class="kpi-label">Total Inquiries</div>
+                </a>
+                <a href="{{ url_for('admin_analytics') }}" class="kpi-card kpi-pending">
+                    <div class="kpi-value">{{ status_counts.pending }}</div>
+                    <div class="kpi-label">Pending</div>
+                </a>
+                <a href="{{ url_for('admin_analytics') }}" class="kpi-card kpi-approved">
+                    <div class="kpi-value">{{ status_counts.approved }}</div>
+                    <div class="kpi-label">Approved</div>
+                </a>
+                <a href="{{ url_for('admin_analytics') }}" class="kpi-card kpi-declined">
+                    <div class="kpi-value">{{ status_counts.declined }}</div>
+                    <div class="kpi-label">Declined</div>
+                </a>
+                <a href="{{ url_for('admin_analytics') }}" class="kpi-card">
+                    <div class="kpi-value">{{ status_counts.approval_rate }}%</div>
+                    <div class="kpi-label">Approval Rate</div>
+                </a>
+                <a href="{{ url_for('admin_analytics') }}" class="kpi-card">
+                    <div class="kpi-value">{{ avg_guests }}</div>
+                    <div class="kpi-label">Avg. Guests</div>
+                </a>
+            </div>
+
+            <!-- ============================================================ -->
+            <!--  TAB: MANAGE INQUIRIES                                       -->
+            <!-- ============================================================ -->
+            {% elif active_tab == 'inquiries' %}
+
+            <h2 class="section-title" style="text-align: left;">Manage Inquiries</h2>
+            <p class="section-subtitle" style="text-align: left;">Filter, review, and update booking statuses.</p>
+
+            <!-- Filter Tabs -->
+            <div class="filter-bar" style="justify-content: flex-start;">
+                <a href="{{ url_for('admin_inquiries', status='all') }}"
+                   class="filter-tab {{ 'active' if status_filter == 'all' }}">All</a>
+                <a href="{{ url_for('admin_inquiries', status='Pending') }}"
+                   class="filter-tab {{ 'active' if status_filter == 'Pending' }}">&#9203; Pending</a>
+                <a href="{{ url_for('admin_inquiries', status='Approved') }}"
+                   class="filter-tab {{ 'active' if status_filter == 'Approved' }}">&#10004; Approved</a>
+                <a href="{{ url_for('admin_inquiries', status='Declined') }}"
+                   class="filter-tab {{ 'active' if status_filter == 'Declined' }}">&#10008; Declined</a>
+            </div>
+
+            <!-- Inquiries Table -->
+            {% if inquiries %}
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tracking Code</th>
+                            <th>Client</th>
+                            <th>Event</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Venue</th>
+                            <th>Guests</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inq in inquiries %}
+                        <tr>
+                            <td class="code-cell">{{ inq.tracking_code }}</td>
+                            <td>
+                                <strong>{{ inq.client_name }}</strong><br>
+                                <small>{{ inq.email }}</small><br>
+                                <small>{{ inq.phone }}</small>
+                            </td>
+                            <td>{{ inq.event_type }}</td>
+                            <td>{{ inq.event_date }}</td>
+                            <td>{{ inq.event_time }}</td>
+                            <td>{{ inq.venue }}</td>
+                            <td class="center">{{ inq.guest_count }}</td>
+                            <td>
+                                <span class="status-badge status-{{ inq.status | lower }}">
+                                    {{ inq.status }}
+                                </span>
+                            </td>
+                            <td class="actions-cell">
+                                {% if inq.status == 'Pending' %}
+                                    <form method="POST"
+                                          action="{{ url_for('update_status', inquiry_id=inq.id) }}"
+                                          class="inline-form">
+                                        <input type="hidden" name="status" value="Approved">
+                                        <button type="submit" class="btn btn-approve btn-sm"
+                                                title="Approve">&#10004; Approve</button>
+                                    </form>
+                                    <form method="POST"
+                                          action="{{ url_for('update_status', inquiry_id=inq.id) }}"
+                                          class="inline-form">
+                                        <input type="hidden" name="status" value="Declined">
+                                        <button type="submit" class="btn btn-decline btn-sm"
+                                                title="Decline">&#10008; Decline</button>
+                                    </form>
+                                {% else %}
+                                    <span class="text-muted">No action</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if inq.details %}
+                        <tr class="details-row">
+                            <td colspan="9">
+                                <em>Notes:</em> {{ inq.details }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">&#128203;</div>
+                <p>No inquiries found{% if status_filter != 'all' %} with status "{{ status_filter }}"{% endif %}.</p>
+            </div>
+            {% endif %}
+
+            {% endif %}
+
+{% endblock %}
