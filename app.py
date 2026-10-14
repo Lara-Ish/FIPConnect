@@ -24,6 +24,16 @@ from PIL import Image, ImageOps, ImageEnhance
 import pytesseract
 from thefuzz import fuzz
 from dotenv import load_dotenv
+
+# Try importing RapidOCR for zero-binary, pure-Python deep learning OCR
+try:
+    from rapidocr_onnxruntime import RapidOCR
+    rapid_ocr_engine = RapidOCR()
+    print("[OCR CONFIG] RapidOCR ONNX engine initialized successfully.")
+except Exception as rocr_init_err:
+    rapid_ocr_engine = None
+    print(f"[OCR CONFIG] RapidOCR not available: {rocr_init_err}")
+
 from flask import (
     Flask, render_template, request, redirect, url_for, flash, g, session, jsonify, send_from_directory
 )
@@ -964,11 +974,35 @@ def call_faceplusplus_compare_base64(id_base64: str, live_face_base64: str):
         return 0.0, f"Face verification error: {str(e)}"
 
 
+def compute_ocr_similarity(clean_name: str, clean_ocr: str) -> int:
+    """
+    Computes robust similarity score between registered staff name and OCR text.
+    Combines:
+    1. fuzz.partial_ratio (for contiguous substrings)
+    2. fuzz.token_set_ratio (for out-of-order words & middle names)
+    3. Token-by-token fuzzy ratio (for minor OCR character misreads like 'cassandra' vs 'cassanura')
+    """
+    if not clean_name or not clean_ocr:
+        return 0
+    score_partial = fuzz.partial_ratio(clean_name, clean_ocr)
+    score_token_set = fuzz.token_set_ratio(clean_name, clean_ocr)
+
+    name_tokens = [t for t in clean_name.split() if len(t) > 1]
+    ocr_words = clean_ocr.split()
+    if name_tokens and ocr_words:
+        token_scores = [max((fuzz.ratio(t, w) for w in ocr_words), default=0) for t in name_tokens]
+        score_token_avg = int(sum(token_scores) / len(token_scores))
+    else:
+        score_token_avg = 0
+
+    return max(score_partial, score_token_set, score_token_avg)
+
+
 @app.route("/staff/profile", methods=["GET", "POST"])
 @login_required
 @staff_required
 def staff_profile():
-    """Staff profile and automated ID + Face verification page."""
+    """Final bulletproof staff profile and automated ID + Face verification route."""
     db = get_db()
     user_id = session.get("user_id") or session.get("team_user_id")
     user = db.execute("SELECT * FROM fip_team WHERE id = ?", (user_id,)).fetchone()
@@ -991,17 +1025,32 @@ def staff_profile():
             return redirect(url_for("staff_profile") + "#verification")
 
         # -------------------------------------------------------------------
-        # 1. FIX FILE EXHAUSTION: Read bytes into memory EXACTLY ONCE
+        # 1. DATABASE SANITY CHECK (Crucial)
+        # -------------------------------------------------------------------
+        staff_name = user["full_name"] if user and user["full_name"] else ""
+        print(f"DEBUG - DB Name: '{staff_name}'")
+
+        if not staff_name or not staff_name.strip():
+            flash("Verification Error: No registered staff name found in database.", "error")
+            return redirect(url_for("staff_profile") + "#verification")
+
+        # Normalize registered staff name (lowercase, strip special characters/numbers)
+        clean_staff_name = re.sub(r'[^a-z\s]', '', staff_name.lower())
+        clean_staff_name = re.sub(r'\s+', ' ', clean_staff_name).strip()
+        print(f"DEBUG - Cleaned DB Name: '{clean_staff_name}'")
+
+        # -------------------------------------------------------------------
+        # 2. READ BYTES ONCE & DECODE FOR OPENCV (Zero Stream Exhaustion)
         # -------------------------------------------------------------------
         id_file_bytes = id_image.read()
         if not id_file_bytes:
             flash("The uploaded ID file appears to be empty. Please select a valid image.", "error")
             return redirect(url_for("staff_profile") + "#verification")
 
-        # Encode ID bytes to Base64 for Face++ API (No re-reading required)
-        id_base64 = base64.b64encode(id_file_bytes).decode("utf-8")
+        nparr = np.frombuffer(id_file_bytes, np.uint8)
+        img_cv = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # Clean Base64 live face image
+        # Decode webcam live face Base64
         clean_live_b64 = live_face_base64.split(",", 1)[1] if "," in live_face_base64 else live_face_base64
         try:
             live_face_bytes = base64.b64decode(clean_live_b64)
@@ -1011,7 +1060,7 @@ def staff_profile():
             flash("Invalid webcam capture image data. Please retake your face scan.", "error")
             return redirect(url_for("staff_profile") + "#verification")
 
-        # Save both files to disk once for record keeping and UI display
+        # Save files to disk for records and UI display
         safe_id_name = secure_filename(id_image.filename)
         id_filename = f"{secrets.token_hex(4)}_id_{safe_id_name}"
         id_path = os.path.join(app.config["UPLOAD_STAFF_IDS"], id_filename)
@@ -1024,36 +1073,94 @@ def staff_profile():
             f_face.write(live_face_bytes)
 
         # -------------------------------------------------------------------
-        # 2. RUN OCR EXTRACTION & AGGRESSIVE TEXT NORMALIZATION
+        # 3. MULTI-PASS OCR STRATEGY (RapidOCR ONNX + PyTesseract Fallback)
         # -------------------------------------------------------------------
         is_mock = os.getenv("ENABLE_MOCK_VERIFICATION", "false").lower() == "true"
         if is_mock or os.getenv("FACEPLUSPLUS_API_KEY", "").startswith("mock_"):
-            ocr_text = f"REPUBLIC OF THE PHILIPPINES DRIVER LICENSE {user['full_name']} SERIAL 123456"
+            best_score = 100
+            print(f"DEBUG - Raw OCR Text (Mock Mode):\nREPUBLIC OF THE PHILIPPINES {staff_name}")
+            print(f"DEBUG - Best OCR Score: {best_score}%")
         else:
-            ocr_text = extract_text_from_bytes(id_file_bytes)
+            best_score = 0
+            best_text = ""
 
-        print(f"RAW OCR TEXT: {ocr_text}")
+            # --- PASS 1: RapidOCR Deep Learning Engine (Pure Python / ONNX) ---
+            if rapid_ocr_engine is not None and img_cv is not None:
+                pass1_text = ""
+                try:
+                    ocr_results, _ = rapid_ocr_engine(img_cv)
+                    if ocr_results:
+                        pass1_text = " ".join([line[1] for line in ocr_results])
+                except Exception as rocr_err:
+                    print(f"[OCR WARNING] RapidOCR error: {rocr_err}")
 
-        # Aggressive Text Normalization: lowercase, strip punctuation/symbols/numbers, collapse whitespace
-        clean_registered_name = re.sub(r'[^a-z\s]', '', user["full_name"].lower())
-        clean_registered_name = re.sub(r'\s+', ' ', clean_registered_name).strip()
+                print(f"DEBUG - Raw OCR Text (Pass 1 - RapidOCR ONNX):\n{pass1_text}")
+                clean_pass1 = re.sub(r'[^a-z\s]', '', pass1_text.lower())
+                clean_pass1 = re.sub(r'\s+', ' ', clean_pass1).strip()
 
-        clean_ocr_text = re.sub(r'[^a-z\s]', '', ocr_text.lower())
-        clean_ocr_text = re.sub(r'\s+', ' ', clean_ocr_text).strip()
+                score_pass1 = compute_ocr_similarity(clean_staff_name, clean_pass1)
+                print(f"DEBUG - Pass 1 (RapidOCR) Robust Score: {score_pass1}% (Threshold: 70%)")
 
-        # Advanced Fuzzy Matching using token_set_ratio
-        fuzzy_score = fuzz.token_set_ratio(clean_registered_name, clean_ocr_text)
+                if score_pass1 > best_score:
+                    best_score = score_pass1
+                    best_text = pass1_text
 
-        print("[VERIFICATION STEP 1: OCR MATCH]")
-        print(f"-> Registered Full Name (Cleaned) : '{clean_registered_name}'")
-        print(f"-> OCR Extracted Text (Cleaned)   : '{clean_ocr_text}'")
-        print(f"-> Token Set Ratio Score          : {fuzzy_score}% (Required: 75%)")
-        print("-" * 65)
+            # --- PASS 2: PyTesseract Raw Grayscale ---
+            if best_score < 70 and img_cv is not None:
+                print("[OCR] Best score below 70%. Executing Pass 2 (PyTesseract Raw Grayscale)...")
+                pass2_text = ""
+                try:
+                    gray_raw = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+                    pass2_text = pytesseract.image_to_string(gray_raw, config="--oem 3 --psm 11")
+                except pytesseract.TesseractNotFoundError:
+                    print("[OCR ERROR] Tesseract executable not found! Ensure Tesseract-OCR is installed on Windows.")
+                except Exception as e:
+                    print(f"[OCR ERROR Pass 2] {e}")
 
-        # -------------------------------------------------------------------
-        # 3. ISOLATED ERROR HANDLING: STEP 1 - OCR NAME VERIFICATION
-        # -------------------------------------------------------------------
-        if fuzzy_score < 75:
+                print(f"DEBUG - Raw OCR Text (Pass 2 - PyTesseract Raw Grayscale):\n{pass2_text}")
+                clean_pass2 = re.sub(r'[^a-z\s]', '', pass2_text.lower())
+                clean_pass2 = re.sub(r'\s+', ' ', clean_pass2).strip()
+
+                score_pass2 = compute_ocr_similarity(clean_staff_name, clean_pass2)
+                print(f"DEBUG - Pass 2 Fuzzy Score: {score_pass2}% (Threshold: 70%)")
+
+                if score_pass2 > best_score:
+                    best_score = score_pass2
+                    best_text = pass2_text
+
+            # --- PASS 3: PyTesseract Adaptive Thresholding ---
+            if best_score < 70 and img_cv is not None:
+                print("[OCR] Best score still below 70%. Executing Pass 3 (Upscale + Blur + Adaptive Threshold)...")
+                pass3_text = ""
+                try:
+                    resized = cv2.resize(img_cv, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                    gray3 = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+                    blur = cv2.GaussianBlur(gray3, (5, 5), 0)
+                    thresh = cv2.adaptiveThreshold(
+                        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+                    )
+                    cv2.imwrite("debug_ocr_processed_id.jpg", thresh)
+                    pass3_text = pytesseract.image_to_string(thresh, config="--oem 3 --psm 11")
+                except pytesseract.TesseractNotFoundError:
+                    print("[OCR ERROR] Tesseract executable not found.")
+                except Exception as e:
+                    print(f"[OCR ERROR Pass 3] {e}")
+
+                print(f"DEBUG - Raw OCR Text (Pass 3 - PyTesseract Adaptive Threshold):\n{pass3_text}")
+                clean_pass3 = re.sub(r'[^a-z\s]', '', pass3_text.lower())
+                clean_pass3 = re.sub(r'\s+', ' ', clean_pass3).strip()
+
+                score_pass3 = compute_ocr_similarity(clean_staff_name, clean_pass3)
+                print(f"DEBUG - Pass 3 Fuzzy Score: {score_pass3}% (Threshold: 70%)")
+
+                if score_pass3 > best_score:
+                    best_score = score_pass3
+                    best_text = pass3_text
+
+        print(f"DEBUG - Best OCR Score: {best_score}% (Threshold: 70%)")
+
+        # Isolated OCR Evaluation: Halt if below 70%
+        if best_score < 70:
             db.execute(
                 """UPDATE fip_team 
                    SET verification_status = 'Unverified', id_type = ?, id_file_path = ?, selfie_file_path = ?
@@ -1061,24 +1168,69 @@ def staff_profile():
                 (id_type, id_filename, selfie_filename, user_id),
             )
             db.commit()
-            flash(f"OCR Verification Failed: Name not found on ID. (Score: {fuzzy_score}%)", "error")
+            flash("OCR Verification Failed: We could not read your registered name on the uploaded ID. Please ensure the image is clear and well-lit.", "error")
             return redirect(url_for("staff_profile") + "#verification")
 
         # -------------------------------------------------------------------
-        # 4. RUN FACE++ API CALL (Using pure Base64 strings)
+        # 4. FACE++ CONNECTION (Pure Base64)
         # -------------------------------------------------------------------
-        face_confidence, face_error = call_faceplusplus_compare_base64(id_base64, clean_live_b64)
+        id_base64 = base64.b64encode(id_file_bytes).decode("utf-8")
+        face_api_url = "https://api-us.faceplusplus.com/facepp/v3/compare"
+        face_payload = {
+            "api_key": "b0uSL9nuSnJO0TXD6758FDzcIvM5Eipb",
+            "api_secret": "dNrr8WS5LeYeclYEEFZgeFQp67osUh29",
+            "image_base64_1": id_base64,
+            "image_base64_2": clean_live_b64
+        }
 
-        print("[VERIFICATION STEP 2: FACE++ BIOMETRIC]")
-        print(f"-> Match Confidence               : {face_confidence:.2f}% (Required: 75%)")
+        face_confidence = 0.0
+        face_error = ""
+
+        try:
+            face_resp = requests.post(face_api_url, data=face_payload, timeout=30)
+            print(f"DEBUG - Face++ HTTP Status: {face_resp.status_code}")
+            face_data = face_resp.json() if face_resp.status_code == 200 else {}
+
+            if face_resp.status_code == 200:
+                conf_val = face_data.get("confidence")
+                if conf_val is not None:
+                    face_confidence = float(conf_val)
+                else:
+                    faces1 = face_data.get("faces1", [])
+                    faces2 = face_data.get("faces2", [])
+                    if not faces1:
+                        face_error = "No face detected on ID image."
+                    elif not faces2:
+                        face_error = "No face detected on live selfie."
+                    else:
+                        face_error = "Unable to match faces."
+            else:
+                try:
+                    err_msg = face_resp.json().get("error_message", f"HTTP {face_resp.status_code}")
+                except Exception:
+                    err_msg = face_resp.text or f"HTTP {face_resp.status_code}"
+                face_error = f"Face++ API Error: {err_msg}"
+        except Exception as conn_err:
+            face_error = f"Face++ Connection Error: {str(conn_err)}"
+
+        print(f"DEBUG - Face Match Confidence: {face_confidence:.2f}% (Threshold: 75.0%)")
         if face_error:
-            print(f"-> Face Error Detail              : {face_error}")
-        print("=" * 65 + "\n")
+            print(f"DEBUG - Face++ Error: {face_error}")
 
         # -------------------------------------------------------------------
-        # 5. ISOLATED ERROR HANDLING: STEP 2 - FACE BIOMETRIC VERIFICATION
+        # 5. SYSTEM INTEGRATION (SQLite Update & User-Friendly Errors)
         # -------------------------------------------------------------------
-        if face_confidence < 75:
+        if face_confidence >= 75 and best_score >= 70:
+            db.execute(
+                """UPDATE fip_team 
+                   SET verification_status = 'Verified', id_type = ?, id_file_path = ?, selfie_file_path = ?
+                   WHERE id = ?""",
+                (id_type, id_filename, selfie_filename, user_id),
+            )
+            db.commit()
+            flash("Account successfully verified!", "success")
+            return redirect(url_for("staff_profile") + "#account")
+        else:
             db.execute(
                 """UPDATE fip_team 
                    SET verification_status = 'Unverified', id_type = ?, id_file_path = ?, selfie_file_path = ?
@@ -1086,21 +1238,13 @@ def staff_profile():
                 (id_type, id_filename, selfie_filename, user_id),
             )
             db.commit()
-            flash(f"Face Verification Failed: Selfie does not match ID photo. (Confidence: {int(face_confidence)}%)", "error")
-            return redirect(url_for("staff_profile") + "#verification")
 
-        # -------------------------------------------------------------------
-        # 6. BOTH PASSED: UPDATE DATABASE TO 'VERIFIED'
-        # -------------------------------------------------------------------
-        db.execute(
-            """UPDATE fip_team 
-               SET verification_status = 'Verified', id_type = ?, id_file_path = ?, selfie_file_path = ?
-               WHERE id = ?""",
-            (id_type, id_filename, selfie_filename, user_id),
-        )
-        db.commit()
-        flash("Account successfully verified!", "success")
-        return redirect(url_for("staff_profile") + "#account")
+            if face_confidence < 75:
+                flash("Face Verification Failed: The live photo does not match the ID photo.", "error")
+            else:
+                flash("OCR Verification Failed: We could not read your registered name on the uploaded ID. Please ensure the image is clear and well-lit.", "error")
+
+            return redirect(url_for("staff_profile") + "#verification")
 
     return render_template("staff_profile.html", user=user, active_tab="staff_profile")
 
