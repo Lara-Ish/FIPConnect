@@ -14,31 +14,49 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-brand">
-                    <h2><span class="logo-accent">FIP</span><span class="sidebar-text"> Admin</span></h2>
+                    <h2><span class="logo-accent">FIP</span><span class="sidebar-text"> {% if session.get('role') == 'admin' or session.get('team_role') == 'admin' %}Admin{% else %}Staff{% endif %}</span></h2>
                 </div>
                 <button class="toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">&#9776;</button>
             </div>
             
             <ul class="sidebar-menu">
-                <li>
-                    <a href="{{ url_for('admin_dashboard') }}" class="{% if active_tab == 'dashboard' %}active{% endif %}" title="Dashboard">
-                        <span class="sidebar-icon">&#127968;</span>
-                        <span class="sidebar-text">Dashboard</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ url_for('admin_inquiries') }}" class="{% if active_tab == 'inquiries' %}active{% endif %}" title="Inquiries">
-                        <span class="sidebar-icon">&#128203;</span>
-                        <span class="sidebar-text">Inquiries</span>
-                    </a>
-                </li>
+                {% if session.get('role') == 'admin' or session.get('team_role') == 'admin' %}
+                <!-- Admin Navigation -->
                 <li>
                     <a href="{{ url_for('admin_analytics') }}" class="{% if active_tab == 'analytics' %}active{% endif %}" title="Analytics">
                         <span class="sidebar-icon">&#128200;</span>
                         <span class="sidebar-text">Analytics</span>
                     </a>
                 </li>
-                <!-- Settings Dropdown -->
+                <li>
+                    <a href="{{ url_for('manage_staff') }}" class="{% if active_tab == 'manage_staff' %}active{% endif %}" title="Manage Staff">
+                        <span class="sidebar-icon">&#128101;</span>
+                        <span class="sidebar-text">Manage Staff</span>
+                    </a>
+                </li>
+                {% else %}
+                <!-- Staff Navigation -->
+                <li>
+                    <a href="{{ url_for('staff_dashboard') }}" class="{% if active_tab == 'staff_dashboard' %}active{% endif %}" title="Dashboard">
+                        <span class="sidebar-icon">&#127968;</span>
+                        <span class="sidebar-text">Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('staff_inquiries') }}" class="{% if active_tab == 'staff_inquiries' %}active{% endif %}" title="Inquiries">
+                        <span class="sidebar-icon">&#128203;</span>
+                        <span class="sidebar-text">Inquiries</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('staff_calendar') }}" class="{% if active_tab == 'staff_calendar' %}active{% endif %}" title="Calendar / Schedules">
+                        <span class="sidebar-icon">&#128197;</span>
+                        <span class="sidebar-text">Calendar</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                <!-- Settings Dropdown (Anchored to Bottom) -->
                 <li style="margin-top: auto;">
                     <div class="settings-menu" style="display: block;">
                         <a href="javascript:void(0)" class="gear-icon" onclick="toggleDropdown()" title="Settings" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
@@ -46,6 +64,15 @@
                             <span class="sidebar-text">Settings</span>
                         </a>
                         <div class="dropdown-content" id="settingsDropdown">
+                            <div style="padding: 10px 14px; font-size: 0.85rem; border-bottom: 1px solid #eee; color: #555; text-align: left;">
+                                <strong style="color: #1a1a1a;">{{ session.get('team_fullname', session.get('team_username', 'User')) }}</strong><br>
+                                <span style="font-size: 0.75rem; color: #C41E3A; font-weight: bold; text-transform: uppercase;">Role: {{ session.get('role', session.get('team_role', 'Staff')) }}</span>
+                            </div>
+                            {% if session.get('role') != 'admin' and session.get('team_role') != 'admin' %}
+                            <a href="{{ url_for('staff_profile') }}" style="border-bottom: 1px solid #f2f2f2; font-size: 0.9rem; text-align: left; padding: 10px 14px;">
+                                &#128100; Profile
+                            </a>
+                            {% endif %}
                             <a href="{{ url_for('logout') }}">&#9211; Logout</a>
                         </div>
                     </div>

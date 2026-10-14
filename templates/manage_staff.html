@@ -1,0 +1,305 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Manage Staff | FIPConnect{% endblock %}
+
+{% block head %}
+    <style>
+        /* Staff Creation Modal Overlay */
+        .staff-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            animation: fadeInModal 0.2s ease-out;
+        }
+
+        .staff-modal-card {
+            background: #ffffff;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+            border: 1px solid #e0e0e0;
+            animation: slideDownModal 0.25s ease-out;
+        }
+
+        .staff-modal-header {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            padding: 1.25rem 1.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #C41E3A;
+        }
+
+        .staff-modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .staff-modal-close {
+            background: none;
+            border: none;
+            color: #ffffff;
+            font-size: 1.6rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            transition: color 0.2s ease;
+        }
+
+        .staff-modal-close:hover {
+            color: #C41E3A;
+        }
+
+        .staff-modal-body {
+            padding: 1.75rem;
+        }
+
+        .file-upload-box {
+            border: 2px dashed #dcdcdc;
+            border-radius: 8px;
+            padding: 1rem;
+            background: #fafafa;
+            text-align: center;
+            transition: border-color 0.2s ease, background 0.2s ease;
+            cursor: pointer;
+        }
+
+        .file-upload-box:hover {
+            border-color: #C41E3A;
+            background: #fdf8f8;
+        }
+
+        .file-upload-box input[type="file"] {
+            width: 100%;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #444;
+        }
+
+        .file-hint {
+            display: block;
+            margin-top: 0.4rem;
+            font-size: 0.78rem;
+            color: #777;
+        }
+
+        @keyframes fadeInModal {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideDownModal {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <!-- Top Header Bar with Primary Action Button -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Staff Management</h2>
+            <p class="section-subtitle" style="text-align: left; margin-bottom: 0;">Create operational accounts with automated credentials, monitor verification, and manage team access.</p>
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary" onclick="openStaffModal()" style="display: inline-flex; align-items: center; gap: 8px; padding: 0.75rem 1.5rem; font-size: 0.95rem;">
+                <span style="font-size: 1.1rem; line-height: 1;">&#10010;</span> Create Staff Account
+            </button>
+        </div>
+    </div>
+
+    <!-- Automated Credential Generation Feedback Alert for Admin -->
+    {% if new_staff_info %}
+    <div id="credentialAlert" class="alert alert-success" style="background-color: #f6ffed; border: 2px solid #b7eb8f; border-radius: 10px; padding: 1.5rem; margin-bottom: 2.25rem; color: #135200; box-shadow: 0 6px 18px rgba(0,0,0,0.06);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h4 style="margin: 0 0 0.5rem 0; color: #135200; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                    <span>&#10004;</span> New Staff Account Created for <strong>{{ new_staff_info.full_name }}</strong>
+                </h4>
+                <p style="margin: 0 0 1rem 0; font-size: 0.95rem; color: #237804;">
+                    Please copy and securely provide these initial login credentials to the staff member. They can change their password anytime via their Staff Profile settings.
+                </p>
+                <div style="display: flex; gap: 2rem; flex-wrap: wrap; background: #ffffff; padding: 1rem 1.5rem; border-radius: 8px; border: 1px solid #d9d9d9;">
+                    <div>
+                        <span style="font-size: 0.75rem; text-transform: uppercase; color: #777; font-weight: 700; display: block; letter-spacing: 0.5px;">Staff Login ID</span>
+                        <code id="newStaffId" style="font-size: 1.25rem; color: #1a1a1a; font-weight: 700;">{{ new_staff_info.login_id }}</code>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.75rem; text-transform: uppercase; color: #777; font-weight: 700; display: block; letter-spacing: 0.5px;">Temporary Password</span>
+                        <code id="newStaffPass" style="font-size: 1.25rem; color: #C41E3A; font-weight: 700;">{{ new_staff_info.temp_password }}</code>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="copyCredentials('{{ new_staff_info.login_id }}', '{{ new_staff_info.temp_password }}')" style="align-self: center; padding: 0.65rem 1.4rem; display: inline-flex; align-items: center; gap: 8px; font-weight: 600;">
+                &#128203; <span id="copyBtnText">Copy Credentials</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Active Staff Directory Table -->
+    <div style="margin-bottom: 3rem;">
+        <h3 style="margin-top: 0; margin-bottom: 1.25rem; color: #1a1a1a; display: flex; align-items: center; gap: 10px; font-size: 1.25rem;">
+            <span>&#128101;</span> Active Staff Directory
+        </h3>
+
+        {% if staff_members %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Staff Name</th>
+                        <th>Staff Login ID</th>
+                        <th>Role</th>
+                        <th>Verification ID</th>
+                        <th>Created Date</th>
+                        <th style="text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for staff in staff_members %}
+                    <tr>
+                        <td>
+                            <strong>{{ staff.full_name }}</strong>
+                        </td>
+                        <td>
+                            <code>{{ staff.username }}</code>
+                        </td>
+                        <td>
+                            <span class="status-badge status-approved">Staff</span>
+                        </td>
+                        <td>
+                            {% if staff.id_file_path %}
+                                <a href="{{ url_for('view_staff_id', filename=staff.id_file_path) }}" target="_blank" class="btn btn-outline btn-sm" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
+                                    &#128196; View Attached ID
+                                </a>
+                            {% else %}
+                                <span class="text-muted" style="font-size: 0.85rem;">No file uploaded</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ staff.created_at }}
+                        </td>
+                        <td style="text-align: right;">
+                            <form method="POST" action="{{ url_for('delete_staff', user_id=staff.id) }}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete staff account {{ staff.username }}?');">
+                                <button type="submit" class="btn btn-decline btn-sm" title="Remove staff member">
+                                    &#128465; Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">&#128101;</div>
+            <p>No staff accounts registered yet.</p>
+            <p style="font-size: 0.9rem; color: #777;">Click the "+ Create Staff Account" button above to generate your first operational staff account.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Hidden Staff Creation Modal (Activated via JavaScript) -->
+    <div id="staffModal" class="staff-modal-overlay" onclick="closeOnBackdrop(event)">
+        <div class="staff-modal-card">
+            <div class="staff-modal-header">
+                <h3><span style="color: #C41E3A;">&#10010;</span> Add New Staff Member</h3>
+                <button type="button" class="staff-modal-close" onclick="closeStaffModal()" title="Close">&times;</button>
+            </div>
+            
+            <form method="POST" action="{{ url_for('manage_staff') }}">
+                <div class="staff-modal-body">
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <label for="full_name" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                            Staff Full Name <span style="color: #C41E3A;">*</span>
+                        </label>
+                        <input type="text" id="full_name" name="full_name" placeholder="e.g. Maria Santos" required style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;">
+                        <small style="display: block; margin-top: 0.5rem; font-size: 0.85rem; color: #666;">
+                            &#128273; The system will automatically generate a sequential <strong>FIPSXXX</strong> Login ID and a randomized 8-character temporary password.
+                        </small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <label style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">Assigned Permission Role</label>
+                        <div style="padding: 0.75rem 1rem; background: #fdfdfd; border: 1px solid #ccc; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+                            <span class="status-badge status-approved" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;">STAFF</span>
+                            <small style="color: #666;">Inquiries & Schedules operations only</small>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.75rem; border-top: 1px solid #f0f0f0; padding-top: 1.25rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeStaffModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">&#10010; Generate Account & Credentials</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        function openStaffModal() {
+            var modal = document.getElementById('staffModal');
+            modal.style.display = 'flex';
+            setTimeout(function() {
+                var nameInput = document.getElementById('full_name');
+                if (nameInput) nameInput.focus();
+            }, 100);
+        }
+
+        function closeStaffModal() {
+            var modal = document.getElementById('staffModal');
+            modal.style.display = 'none';
+        }
+
+        function closeOnBackdrop(event) {
+            if (event.target.id === 'staffModal') {
+                closeStaffModal();
+            }
+        }
+
+        // Close modal when pressing ESC key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeStaffModal();
+            }
+        });
+
+        // Copy generated credentials to clipboard
+        function copyCredentials(loginId, tempPassword) {
+            var text = "FIPConnect Staff Credentials:\nLogin ID: " + loginId + "\nTemporary Password: " + tempPassword;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    var btnText = document.getElementById('copyBtnText');
+                    if (btnText) {
+                        btnText.textContent = "Copied!";
+                        setTimeout(function() { btnText.textContent = "Copy Credentials"; }, 2500);
+                    }
+                }).catch(function() {
+                    prompt("Copy staff credentials below (Ctrl+C):", text);
+                });
+            } else {
+                prompt("Copy staff credentials below (Ctrl+C):", text);
+            }
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,328 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Inquiry Details &mdash; {{ inquiry.tracking_code }} | FIPConnect{% endblock %}
+
+{% block head %}
+    <style>
+        .detail-container {
+            max-width: 950px;
+            margin: 0;
+        }
+
+        .detail-top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.75rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .detail-header-card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 2rem 2.25rem;
+            margin-bottom: 1.75rem;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+            border-left: 6px solid #8B0000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .detail-title {
+            margin: 0 0 0.35rem 0;
+            font-size: 1.6rem;
+            color: #1a1a1a;
+            font-weight: 800;
+        }
+
+        .detail-code {
+            font-family: 'Courier New', Courier, monospace;
+            color: #C41E3A;
+            font-weight: 800;
+            font-size: 1.15rem;
+            letter-spacing: 1px;
+        }
+
+        .info-card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 2rem 2.25rem;
+            margin-bottom: 1.75rem;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+        }
+
+        .info-card-header {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            color: #1a1a1a;
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #f4f4f4;
+            padding-bottom: 0.75rem;
+        }
+
+        .spec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem 2rem;
+        }
+
+        .spec-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #777;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.35rem;
+        }
+
+        .spec-value {
+            font-size: 1.05rem;
+            color: #222;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .service-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-top: 0.5rem;
+        }
+
+        .service-tag {
+            background-color: #fdf5f6;
+            color: #8B0000;
+            border: 1px solid #f5c6cb;
+            padding: 0.4rem 0.9rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .notes-box {
+            background-color: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            padding: 1.25rem;
+            color: #333;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            margin-top: 0.5rem;
+        }
+
+        .actions-panel {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1.75rem 2.25rem;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+            margin-bottom: 3rem;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="detail-container">
+        <!-- Top Navigation -->
+        <div class="detail-top-nav">
+            <a href="{{ url_for('staff_inquiries') }}" class="btn-back" style="margin-bottom: 0;">
+                &larr; Back to Inquiries List
+            </a>
+            <div>
+                <a href="{{ url_for('staff_calendar') }}" class="btn btn-outline btn-sm">
+                    &#128197; View in Calendar
+                </a>
+            </div>
+        </div>
+
+        <!-- 1. Header Banner Card -->
+        <div class="detail-header-card">
+            <div>
+                <div class="detail-code">Tracking Code: {{ inquiry.tracking_code }}</div>
+                <h2 class="detail-title">{{ inquiry.event_type }} &mdash; {{ inquiry.client_name }}</h2>
+                <div style="font-size: 0.9rem; color: #666;">
+                    Submitted on {{ inquiry.created_at }} &bull; Last updated {{ inquiry.updated_at }}
+                </div>
+            </div>
+            <div>
+                <span class="status-badge status-{{ inquiry.status | lower }}" style="font-size: 1rem; padding: 0.5rem 1.25rem;">
+                    Status: {{ inquiry.status }}
+                </span>
+            </div>
+        </div>
+
+        <!-- 2. Event Logistics & Location -->
+        <div class="info-card">
+            <h3 class="info-card-header">
+                <span>&#128197;</span> Event Logistics & Location
+            </h3>
+            <div class="spec-grid">
+                <div>
+                    <div class="spec-label">Event Type</div>
+                    <div class="spec-value">{{ inquiry.event_type }}</div>
+                </div>
+
+                <div>
+                    <div class="spec-label">Target Date</div>
+                    <div class="spec-value">{{ inquiry.event_date }}</div>
+                </div>
+
+                <div>
+                    <div class="spec-label">Event Time / Schedule</div>
+                    <div class="spec-value">
+                        {% if inquiry.event_time and inquiry.event_time != '00:00' %}
+                            &#9200; {{ inquiry.event_time }}
+                        {% else %}
+                            TBD / Full Day
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="spec-label">Location / Venue</div>
+                    <div class="spec-value">{{ inquiry.venue }}</div>
+                </div>
+
+                <div>
+                    <div class="spec-label">Estimated Guest Count</div>
+                    <div class="spec-value">{{ inquiry.guest_count }} Attendees</div>
+                </div>
+
+                {% if parsed.duration %}
+                <div>
+                    <div class="spec-label">Event Duration</div>
+                    <div class="spec-value">{{ parsed.duration }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 3. Client Information -->
+        <div class="info-card">
+            <h3 class="info-card-header">
+                <span>&#128100;</span> Client Contact Information
+            </h3>
+            <div class="spec-grid">
+                <div>
+                    <div class="spec-label">Client Name</div>
+                    <div class="spec-value">{{ inquiry.client_name }}</div>
+                </div>
+
+                <div>
+                    <div class="spec-label">Email Address</div>
+                    <div class="spec-value">
+                        <a href="mailto:{{ inquiry.email }}" style="color: #C41E3A; text-decoration: none;">
+                            {{ inquiry.email }}
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="spec-label">Contact Phone</div>
+                    <div class="spec-value">
+                        <a href="tel:{{ inquiry.phone }}" style="color: #1a1a1a; text-decoration: none;">
+                            &#128222; {{ inquiry.phone }}
+                        </a>
+                    </div>
+                </div>
+
+                {% if parsed.organization %}
+                <div>
+                    <div class="spec-label">Organization / Company</div>
+                    <div class="spec-value">{{ parsed.organization }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 4. Budget & Specific Service Requirements -->
+        <div class="info-card">
+            <h3 class="info-card-header">
+                <span>&#128203;</span> Budget & Services Required
+            </h3>
+
+            <div style="margin-bottom: 1.5rem;">
+                <div class="spec-label">Estimated Budget</div>
+                <div class="spec-value" style="font-size: 1.2rem; color: #1e7e34;">
+                    {{ parsed.budget or 'Not specified' }}
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.75rem;">
+                <div class="spec-label">Specific Production Services Checked</div>
+                {% if parsed.services %}
+                    <div class="service-tags-container">
+                        {% for svc in parsed.services %}
+                            <span class="service-tag">&#10004; {{ svc }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-muted" style="margin-top: 0.35rem; font-size: 0.95rem;">
+                        No specific production checkboxes selected.
+                    </div>
+                {% endif %}
+            </div>
+
+            <div>
+                <div class="spec-label">Client Requirements / Text Area Notes</div>
+                {% if parsed.notes %}
+                    <div class="notes-box">{{ parsed.notes }}</div>
+                {% elif inquiry.details %}
+                    <div class="notes-box">{{ inquiry.details }}</div>
+                {% else %}
+                    <div class="text-muted" style="margin-top: 0.35rem; font-size: 0.95rem;">
+                        No additional notes provided by client.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 5. Status Actions Panel -->
+        <div class="actions-panel">
+            <div>
+                <strong style="color: #1a1a1a; font-size: 1.05rem;">Process Booking Status:</strong><br>
+                <small style="color: #666;">Approving will automatically place this event on the interactive staff calendar.</small>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                {% if inquiry.status != 'Approved' %}
+                    <form method="POST" action="{{ url_for('update_status', inquiry_id=inquiry.id) }}">
+                        <input type="hidden" name="status" value="Approved">
+                        <input type="hidden" name="redirect_to" value="detail">
+                        <button type="submit" class="btn btn-approve" style="padding: 0.65rem 1.4rem;">
+                            &#10004; Approve Event
+                        </button>
+                    </form>
+                {% endif %}
+
+                {% if inquiry.status != 'Declined' %}
+                    <form method="POST" action="{{ url_for('update_status', inquiry_id=inquiry.id) }}">
+                        <input type="hidden" name="status" value="Declined">
+                        <input type="hidden" name="redirect_to" value="detail">
+                        <button type="submit" class="btn btn-decline" style="padding: 0.65rem 1.4rem;">
+                            &#10008; Decline Event
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,289 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Event Calendar | FIPConnect{% endblock %}
+
+{% block head %}
+    <!-- FullCalendar.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    <style>
+        /* FullCalendar Custom Theming for FIPConnect */
+        .fc {
+            background-color: #fff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.05);
+            border: 1px solid #e8e8e8;
+            font-family: inherit;
+        }
+
+        .fc .fc-toolbar-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #1a1a1a;
+        }
+
+        .fc .fc-button-primary {
+            background-color: #1a1a1a;
+            border-color: #1a1a1a;
+            color: #fff;
+            font-weight: 600;
+            border-radius: 6px;
+            padding: 0.4rem 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .fc .fc-button-primary:hover,
+        .fc .fc-button-primary:focus {
+            background-color: #C41E3A;
+            border-color: #C41E3A;
+            box-shadow: none;
+        }
+
+        .fc .fc-button-primary:disabled {
+            background-color: #ccc;
+            border-color: #ccc;
+        }
+
+        .fc .fc-button-active {
+            background-color: #8B0000 !important;
+            border-color: #8B0000 !important;
+        }
+
+        .fc-theme-standard td, .fc-theme-standard th {
+            border-color: #f0f0f0;
+        }
+
+        .fc-col-header-cell {
+            background-color: #fafafa;
+            padding: 0.6rem 0;
+            font-weight: 700;
+            color: #444;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+        }
+
+        .fc-event {
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border-left: 4px solid #C41E3A !important;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.15s ease;
+        }
+
+        .fc-event:hover {
+            transform: scale(1.02);
+            filter: brightness(1.1);
+        }
+
+        /* Event Details Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(2px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-card {
+            background: #fff;
+            width: 90%;
+            max-width: 520px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+            animation: slideDown 0.25s ease-out;
+        }
+
+        .modal-header {
+            background: #1a1a1a;
+            color: #fff;
+            padding: 1.25rem 1.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #C41E3A;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .modal-close:hover {
+            color: #C41E3A;
+        }
+
+        .modal-body {
+            padding: 1.75rem;
+        }
+
+        .modal-info-row {
+            display: flex;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #f2f2f2;
+            padding-bottom: 0.6rem;
+        }
+
+        .modal-info-label {
+            width: 120px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #777;
+            text-transform: uppercase;
+        }
+
+        .modal-info-value {
+            flex: 1;
+            font-size: 0.95rem;
+            color: #222;
+            font-weight: 600;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.75rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Event Schedules & Calendar</h2>
+            <p class="section-subtitle" style="text-align: left; margin-bottom: 0;">Interactive timeline for all approved event bookings. Click any event for full client and venue specs.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('staff_inquiries') }}" class="btn btn-outline" style="padding: 0.6rem 1.25rem; font-size: 0.9rem;">
+                &#128203; Manage Inquiries Table
+            </a>
+        </div>
+    </div>
+
+    <!-- Calendar Container -->
+    <div id="calendar"></div>
+
+    <!-- Event Details Modal Popover -->
+    <div id="eventModal" class="modal-overlay" onclick="closeModalOnBackdrop(event)">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalEventTitle">Event Details</h3>
+                <button type="button" class="modal-close" onclick="closeEventModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-info-row">
+                    <div class="modal-info-label">Tracking Code</div>
+                    <div class="modal-info-value" id="modalTrackingCode" style="color: #C41E3A; font-family: monospace; font-size: 1.05rem;"></div>
+                </div>
+                <div class="modal-info-row">
+                    <div class="modal-info-label">Client Name</div>
+                    <div class="modal-info-value" id="modalClientName"></div>
+                </div>
+                <div class="modal-info-row">
+                    <div class="modal-info-label">Contact</div>
+                    <div class="modal-info-value" id="modalClientContact"></div>
+                </div>
+                <div class="modal-info-row">
+                    <div class="modal-info-label">Date & Time</div>
+                    <div class="modal-info-value" id="modalDateTime"></div>
+                </div>
+                <div class="modal-info-row">
+                    <div class="modal-info-label">Venue</div>
+                    <div class="modal-info-value" id="modalVenue"></div>
+                </div>
+                <div class="modal-info-row">
+                    <div class="modal-info-label">Guest Count</div>
+                    <div class="modal-info-value" id="modalGuestCount"></div>
+                </div>
+                <div class="modal-info-row" style="border-bottom: none;">
+                    <div class="modal-info-label">Notes</div>
+                    <div class="modal-info-value" id="modalNotes" style="font-weight: normal; color: #555; line-height: 1.4;"></div>
+                </div>
+                <div style="margin-top: 1.5rem; text-align: right;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="closeEventModal()">Close Details</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listMonth'
+                },
+                buttonText: {
+                    today: 'Today',
+                    month: 'Month',
+                    week: 'Week',
+                    list: 'List'
+                },
+                events: "{{ url_for('staff_api_events') }}",
+                navLinks: true,
+                editable: false,
+                dayMaxEvents: true,
+                eventTimeFormat: {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    meridiem: 'short'
+                },
+                eventClick: function(info) {
+                    openEventModal(info.event);
+                }
+            });
+
+            calendar.render();
+        });
+
+        function openEventModal(event) {
+            const props = event.extendedProps;
+            document.getElementById('modalEventTitle').textContent = props.eventType || event.title;
+            document.getElementById('modalTrackingCode').textContent = props.trackingCode || 'N/A';
+            document.getElementById('modalClientName').textContent = props.clientName || 'N/A';
+            document.getElementById('modalClientContact').textContent = (props.phone ? '📞 ' + props.phone : '') + (props.email ? ' | ✉️ ' + props.email : '');
+            
+            // Format Date & Time nicely
+            let dateStr = event.start ? event.start.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '';
+            let timeStr = event.start ? event.start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+            document.getElementById('modalDateTime').textContent = dateStr + (event.allDay ? ' (All Day)' : ' at ' + timeStr);
+            
+            document.getElementById('modalVenue').textContent = props.venue || 'TBD';
+            document.getElementById('modalGuestCount').textContent = (props.guestCount || '0') + ' Attendees';
+            document.getElementById('modalNotes').textContent = props.details || 'No additional notes provided.';
+
+            document.getElementById('eventModal').style.display = 'flex';
+        }
+
+        function closeEventModal() {
+            document.getElementById('eventModal').style.display = 'none';
+        }
+
+        function closeModalOnBackdrop(e) {
+            if (e.target.id === 'eventModal') {
+                closeEventModal();
+            }
+        }
+    </script>
+{% endblock %}

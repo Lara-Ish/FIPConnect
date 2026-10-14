@@ -1,0 +1,684 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Staff Settings & Profile | FIPConnect{% endblock %}
+
+{% block head %}
+    <style>
+        .profile-container {
+            max-width: 1100px;
+            margin: 0;
+        }
+
+        /* --- 2-Column Responsive Layout --- */
+        .profile-layout {
+            display: grid;
+            grid-template-columns: 290px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* --- Left Column: Vertical Navigation --- */
+        .profile-nav-col {
+            position: sticky;
+            top: 1.5rem;
+        }
+
+        .vertical-tabs-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #ffffff;
+            padding: 1.25rem;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+        }
+
+        .nav-group-title {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #888888;
+            letter-spacing: 0.75px;
+            margin-bottom: 0.5rem;
+            padding-left: 0.25rem;
+        }
+
+        /* Default Vertical Button State */
+        .vertical-tab-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.95rem 1.15rem;
+            background-color: #f8f9fa;
+            color: #1a1a1a;
+            border: 1px solid #e2e2e2;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.22s ease-in-out;
+        }
+
+        /* Hover State */
+        .vertical-tab-btn:hover {
+            background-color: #C41E3A;
+            color: #ffffff;
+            border-color: #C41E3A;
+            transform: translateX(4px);
+        }
+
+        /* Active Button State (Solid FIP Crimson) */
+        .vertical-tab-btn.active {
+            background-color: #C41E3A;
+            color: #ffffff;
+            border-color: #C41E3A;
+            box-shadow: 0 4px 14px rgba(196, 30, 58, 0.28);
+        }
+
+        .vertical-tab-btn .tab-icon {
+            font-size: 1.15rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .vertical-tab-btn .tab-label {
+            flex: 1;
+            line-height: 1.35;
+        }
+
+        /* --- Right Column: Content Section --- */
+        .profile-content-col {
+            min-width: 0; /* Prevents overflow in CSS Grid */
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+            animation: fadeInTab 0.22s ease-out;
+        }
+
+        @keyframes fadeInTab {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Card container styles */
+        .profile-card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+            padding: 2.25rem 2.5rem;
+            margin-bottom: 0;
+        }
+
+        .profile-card-title {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            color: #1a1a1a;
+            font-size: 1.3rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #f2f2f2;
+            padding-bottom: 0.75rem;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem 2rem;
+        }
+
+        .profile-item-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #777;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.35rem;
+        }
+
+        .profile-item-val {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .verification-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .badge-verified {
+            background-color: #e6f9e6;
+            color: #1e7e34;
+            border: 1px solid #b7eb8f;
+        }
+
+        .badge-pending {
+            background-color: #fff9e6;
+            color: #b08a00;
+            border: 1px solid #ffe58f;
+        }
+
+        .badge-unverified {
+            background-color: #fdf3f4;
+            color: #c41e3a;
+            border: 1px solid #ffa39e;
+        }
+
+        .upload-area {
+            border: 2px dashed #dcdcdc;
+            border-radius: 8px;
+            padding: 1.5rem;
+            background: #fafafa;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #C41E3A;
+            background: #fdf8f8;
+        }
+
+        .upload-area input[type="file"] {
+            width: 100%;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 860px) {
+            .profile-layout {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .profile-nav-col {
+                position: static;
+            }
+
+            .profile-card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="profile-container">
+        <!-- Page Header -->
+        <div style="margin-bottom: 2rem;">
+            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Staff Settings & Profile</h2>
+            <p class="section-subtitle" style="text-align: left; margin-bottom: 0;">Manage your staff account credentials, submit identification documents, and update your password.</p>
+        </div>
+
+        <!-- 2-Column Vertical Layout -->
+        <div class="profile-layout">
+            
+            <!-- Left Column: Vertical Navigation Menu -->
+            <aside class="profile-nav-col">
+                <div class="vertical-tabs-nav" role="tablist">
+                    <div class="nav-group-title">Account Settings</div>
+                    
+                    <button type="button" class="vertical-tab-btn active" id="tabBtnAccount" onclick="showTab('accountTab', this)">
+                        <span class="tab-icon">&#128100;</span>
+                        <span class="tab-label">Account Information & Status</span>
+                    </button>
+                    
+                    <button type="button" class="vertical-tab-btn" id="tabBtnVerification" onclick="showTab('verificationTab', this)">
+                        <span class="tab-icon">&#128196;</span>
+                        <span class="tab-label">Submit / Update Verification ID</span>
+                    </button>
+                    
+                    <button type="button" class="vertical-tab-btn" id="tabBtnPassword" onclick="showTab('passwordTab', this)">
+                        <span class="tab-icon">&#128274;</span>
+                        <span class="tab-label">Change Password</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Right Column: Content Area -->
+            <div class="profile-content-col">
+                
+                <!-- Container 1: Account Information & Status (Visible by Default) -->
+                <div id="accountTab" class="tab-pane active">
+                    <div class="profile-card">
+                        <h3 class="profile-card-title">
+                            <span>&#128100;</span> Account Information & Status
+                        </h3>
+
+                        <div class="profile-grid">
+                            <div>
+                                <div class="profile-item-label">Full Name</div>
+                                <div class="profile-item-val">{{ user.full_name }}</div>
+                            </div>
+
+                            <div>
+                                <div class="profile-item-label">Staff Login ID</div>
+                                <div class="profile-item-val"><code>{{ user.username }}</code></div>
+                            </div>
+
+                            <div>
+                                <div class="profile-item-label">Assigned Role</div>
+                                <div class="profile-item-val">
+                                    <span class="status-badge status-approved" style="font-size: 0.75rem;">STAFF</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="profile-item-label">Verification Status</div>
+                                <div class="profile-item-val">
+                                    {% if user.verification_status == 'Verified' %}
+                                        <span class="verification-badge badge-verified">&#10004; Verified</span>
+                                    {% elif user.verification_status == 'Pending Verification' %}
+                                        <span class="verification-badge badge-pending">&#9203; Pending Verification</span>
+                                    {% else %}
+                                        <span class="verification-badge badge-unverified">&#10008; Unverified</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="profile-item-label">Registered ID Type</div>
+                                <div class="profile-item-val">
+                                    {{ user.id_type or 'None on file' }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="profile-item-label">Attached ID Document</div>
+                                <div class="profile-item-val">
+                                    {% if user.id_file_path %}
+                                        <a href="{{ url_for('view_staff_id', filename=user.id_file_path) }}" target="_blank" class="btn btn-outline btn-sm" style="padding: 0.3rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
+                                            &#128196; View ID Image
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted" style="font-size: 0.9rem;">No document submitted</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if user.selfie_file_path %}
+                            <div>
+                                <div class="profile-item-label">Attached Selfie / Face</div>
+                                <div class="profile-item-val">
+                                    <a href="{{ url_for('view_staff_id', filename=user.selfie_file_path) }}" target="_blank" class="btn btn-outline btn-sm" style="padding: 0.3rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
+                                        &#128248; View Selfie Photo
+                                    </a>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Container 2: Submit / Update Verification ID (Hidden by Default) -->
+                <div id="verificationTab" class="tab-pane">
+                    <div class="profile-card">
+                        <h3 class="profile-card-title">
+                            <span style="color: #C41E3A;">&#128196;</span> Automated ID & Face Verification
+                        </h3>
+
+                        <!-- Info Banner explaining automated OCR and Face++ pipeline -->
+                        <div class="alert alert-info" style="background-color: #f0f7ff; border-left: 5px solid #1890ff; padding: 1.25rem; border-radius: 8px; margin-bottom: 2rem; color: #003a8c;">
+                            <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #003a8c; display: flex; align-items: center; gap: 6px;">
+                                <span>&#129302;</span> Automated Verification Pipeline
+                            </h4>
+                            <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; line-height: 1.5;">
+                                FIPConnect verifies your identity using real-time automated intelligence:
+                            </p>
+                            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.88rem; line-height: 1.6;">
+                                <li><strong>OCR Text Matching:</strong> Extracts text from your ID card to verify your registered legal name: <code>{{ user.full_name }}</code>.</li>
+                                <li><strong>Face++ Biometric AI:</strong> Compares your live selfie with the photo on your government ID (requires &ge; 75% confidence).</li>
+                            </ul>
+                        </div>
+
+                        <form method="POST" action="{{ url_for('staff_profile') }}" enctype="multipart/form-data" id="verificationForm" onsubmit="return validateVerificationForm(event)">
+                            <!-- ID Type Dropdown -->
+                            <div class="form-row" style="margin-bottom: 1.75rem;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label for="id_type" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                        Valid ID Type <span style="color: #C41E3A;">*</span>
+                                    </label>
+                                    <select name="id_type" id="id_type" class="form-control" required style="width: 100%; padding: 0.85rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem; background-color: #fff;">
+                                        <option value="" disabled {% if not user.id_type %}selected{% endif %}>Choose your government-issued ID type...</option>
+                                        <option value="Driver's License" {% if user.id_type == "Driver's License" %}selected{% endif %}>Driver's License</option>
+                                        <option value="Passport" {% if user.id_type == "Passport" %}selected{% endif %}>Passport</option>
+                                        <option value="UMID" {% if user.id_type == "UMID" %}selected{% endif %}>UMID (Unified Multi-Purpose ID)</option>
+                                        <option value="National ID" {% if user.id_type == "National ID" %}selected{% endif %}>National ID (PhilSys)</option>
+                                        <option value="PRC ID" {% if user.id_type == "PRC ID" %}selected{% endif %}>Professional Regulation Commission (PRC) ID</option>
+                                        <option value="Postal ID" {% if user.id_type == "Postal ID" %}selected{% endif %}>Postal ID</option>
+                                        <option value="Voter's ID" {% if user.id_type == "Voter's ID" %}selected{% endif %}>Voter's ID</option>
+                                        <option value="Other Valid Government ID" {% if user.id_type == "Other Valid Government ID" %}selected{% endif %}>Other Valid Government-Issued ID</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Dual Verification Inputs: ID Image Upload & Live Webcam Face Scan -->
+                            <div class="form-row" style="display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                                <!-- Left Column: Upload Front ID Image -->
+                                <div class="form-group" style="flex: 1; min-width: 280px;">
+                                    <label for="id_image" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                        Upload ID Image <span style="color: #C41E3A;">*</span>
+                                    </label>
+                                    <div class="upload-area" style="min-height: 240px; display: flex; flex-direction: column; justify-content: center;">
+                                        <input type="file" id="id_image" name="id_image" accept="image/*" required>
+                                        <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #666;">
+                                            &#128196; Clear scan or photo of the ID front with legible name &amp; portrait
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Column: Live Face Scan (Webcam Capture) -->
+                                <div class="form-group" style="flex: 1; min-width: 280px;">
+                                    <label style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                        Live Face Scan (Webcam) <span style="color: #C41E3A;">*</span>
+                                    </label>
+                                    <div class="webcam-card" style="border: 2px dashed #dcdcdc; border-radius: 8px; padding: 1.25rem; background: #fafafa; text-align: center; min-height: 240px; display: flex; flex-direction: column; justify-content: center; position: relative;">
+                                        
+                                        <!-- Standby Placeholder -->
+                                        <div id="cameraPlaceholder" style="padding: 1.5rem 0.5rem; color: #666;">
+                                            <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">📷</div>
+                                            <div style="font-weight: 600; color: #333; margin-bottom: 0.25rem;">Live Biometric Face Scan</div>
+                                            <div style="font-size: 0.82rem; color: #777;">Click "Start Camera" to initialize your webcam stream.</div>
+                                        </div>
+
+                                        <!-- HTML5 Video Viewport -->
+                                        <video id="webcamVideo" autoplay playsinline muted style="display: none; width: 100%; max-height: 240px; object-fit: cover; border-radius: 6px; background: #111; border: 2px solid #C41E3A;"></video>
+
+                                        <!-- Captured Photo Preview -->
+                                        <img id="capturedFacePreview" src="" alt="Captured Face Preview" style="display: none; width: 100%; max-height: 240px; object-fit: cover; border-radius: 6px; border: 2px solid #28a745;">
+
+                                        <!-- Hidden Canvas & Base64 Payload -->
+                                        <canvas id="faceCanvas" style="display: none;"></canvas>
+                                        <input type="hidden" name="live_face_base64" id="live_face_base64" value="">
+
+                                        <!-- Controls -->
+                                        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                                            <button type="button" class="btn btn-outline" id="startCameraBtn" onclick="startCamera()" style="padding: 0.45rem 1.1rem; font-size: 0.88rem; font-weight: 600;">
+                                                <span>📷</span> Start Camera
+                                            </button>
+                                            <button type="button" class="btn btn-primary" id="captureFaceBtn" onclick="captureFace()" style="display: none; padding: 0.45rem 1.1rem; font-size: 0.88rem; font-weight: 600; background: #28a745; border-color: #28a745;">
+                                                <span>📸</span> Capture Face
+                                            </button>
+                                            <button type="button" class="btn btn-outline" id="retakeFaceBtn" onclick="retakeFace()" style="display: none; padding: 0.45rem 1.1rem; font-size: 0.88rem; font-weight: 600;">
+                                                <span>🔄</span> Retake Photo
+                                            </button>
+                                        </div>
+
+                                        <!-- Guidance / Status text -->
+                                        <div id="cameraStatus" style="margin-top: 0.65rem; font-size: 0.82rem; color: #666; font-weight: 600;">
+                                            Camera idle. Click "Start Camera" to begin.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="text-align: right;">
+                                <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2.2rem; font-size: 1rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+                                    <span>&#9881;</span> Run Automated Verification
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Container 3: Change Password (Hidden by Default) -->
+                <div id="passwordTab" class="tab-pane">
+                    <div class="profile-card">
+                        <h3 class="profile-card-title">
+                            <span style="color: #C41E3A;">&#128274;</span> Change Password
+                        </h3>
+                        <p style="color: #666; font-size: 0.95rem; margin-top: -0.5rem; margin-bottom: 1.5rem;">
+                            Keep your staff account secure by updating your initial temporary password to a strong personal password.
+                        </p>
+
+                        <form method="POST" action="{{ url_for('staff_change_password') }}">
+                            <div class="form-group" style="margin-bottom: 1.25rem;">
+                                <label for="current_password" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                    Current Password <span style="color: #C41E3A;">*</span>
+                                </label>
+                                <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter your current or temporary password" required style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                            </div>
+
+                            <div class="form-row" style="display: flex; gap: 1.5rem; margin-bottom: 1.75rem; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 250px;">
+                                    <label for="new_password" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                        New Password <span style="color: #C41E3A;">*</span>
+                                    </label>
+                                    <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Minimum 6 characters" required minlength="6" style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                                </div>
+                                <div class="form-group" style="flex: 1; min-width: 250px;">
+                                    <label for="confirm_password" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                        Confirm New Password <span style="color: #C41E3A;">*</span>
+                                    </label>
+                                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Re-enter new password" required minlength="6" style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                                </div>
+                            </div>
+
+                            <div style="text-align: right;">
+                                <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2rem; font-size: 1rem;">
+                                    &#128274; Update Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        /**
+         * Switches between vertical tab panes and manages active button state.
+         * @param {string} tabId - Target container ID ('accountTab', 'verificationTab', 'passwordTab')
+         * @param {HTMLElement} btnElement - The clicked vertical button element
+         */
+        function showTab(tabId, btnElement) {
+            // 1. Hide all tab panes
+            var panes = document.querySelectorAll('.tab-pane');
+            panes.forEach(function(pane) {
+                pane.classList.remove('active');
+            });
+
+            // 2. Remove active class from all vertical buttons
+            var buttons = document.querySelectorAll('.vertical-tab-btn');
+            buttons.forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+
+            // 3. Display target tab container
+            var targetPane = document.getElementById(tabId);
+            if (targetPane) {
+                targetPane.classList.add('active');
+            }
+
+            // 4. Set clicked vertical button to active
+            if (btnElement) {
+                btnElement.classList.add('active');
+            }
+
+            // Stop webcam if leaving the verification tab
+            if (tabId !== 'verificationTab' && videoStream) {
+                videoStream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+                videoStream = null;
+            }
+        }
+
+        // Support URL hash switching on page load (e.g. #verification or #password)
+        document.addEventListener('DOMContentLoaded', function() {
+            var hash = window.location.hash;
+            if (hash === '#verification') {
+                showTab('verificationTab', document.getElementById('tabBtnVerification'));
+            } else if (hash === '#password') {
+                showTab('passwordTab', document.getElementById('tabBtnPassword'));
+            }
+        });
+
+        /* ==========================================================================
+           Webcam Live Face Capture (Face++ Biometrics)
+           ========================================================================== */
+        var videoStream = null;
+
+        /**
+         * Initialize and display live webcam stream inside HTML5 <video>
+         */
+        async function startCamera() {
+            var video = document.getElementById('webcamVideo');
+            var placeholder = document.getElementById('cameraPlaceholder');
+            var preview = document.getElementById('capturedFacePreview');
+            var startBtn = document.getElementById('startCameraBtn');
+            var captureBtn = document.getElementById('captureFaceBtn');
+            var retakeBtn = document.getElementById('retakeFaceBtn');
+            var statusText = document.getElementById('cameraStatus');
+
+            try {
+                statusText.textContent = "Connecting to camera...";
+                statusText.style.color = "#0056b3";
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Webcam access is not supported by your browser or connection.");
+                }
+
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user"
+                    },
+                    audio: false
+                });
+
+                video.srcObject = videoStream;
+                await video.play();
+
+                // Viewport adjustments
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+                preview.style.display = 'none';
+
+                // Button states
+                startBtn.style.display = 'none';
+                captureBtn.style.display = 'inline-flex';
+                captureBtn.disabled = false;
+                retakeBtn.style.display = 'none';
+
+                statusText.textContent = "● Camera active. Align your face forward and click 'Capture Face'.";
+                statusText.style.color = "#28a745";
+            } catch (err) {
+                console.error("Webcam initialization error:", err);
+                statusText.textContent = "Camera error: " + (err.message || "Permission denied or no webcam available.");
+                statusText.style.color = "#c41e3a";
+                alert("Camera Access Error: Please ensure camera permissions are allowed in your browser to perform live face verification.");
+            }
+        }
+
+        /**
+         * Draw current video frame to canvas, encode to Base64, and populate hidden input
+         */
+        function captureFace() {
+            var video = document.getElementById('webcamVideo');
+            var canvas = document.getElementById('faceCanvas');
+            var preview = document.getElementById('capturedFacePreview');
+            var hiddenInput = document.getElementById('live_face_base64');
+            var captureBtn = document.getElementById('captureFaceBtn');
+            var retakeBtn = document.getElementById('retakeFaceBtn');
+            var statusText = document.getElementById('cameraStatus');
+
+            if (!videoStream || !video.videoWidth) {
+                alert("The camera stream is still initializing. Please wait a second and try again.");
+                return;
+            }
+
+            // Sync canvas resolution with actual video stream
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert canvas frame to JPEG Base64 string
+            var base64Data = canvas.toDataURL('image/jpeg', 0.95);
+            hiddenInput.value = base64Data;
+
+            // Render captured preview and hide live video
+            preview.src = base64Data;
+            preview.style.display = 'block';
+            video.style.display = 'none';
+
+            // Stop camera hardware stream
+            if (videoStream) {
+                videoStream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+                videoStream = null;
+            }
+
+            // Update button visibility and status feedback
+            captureBtn.style.display = 'none';
+            retakeBtn.style.display = 'inline-flex';
+            statusText.textContent = "✓ Face captured successfully! Ready for verification.";
+            statusText.style.color = "#28a745";
+        }
+
+        /**
+         * Clear previous capture and re-open webcam stream
+         */
+        function retakeFace() {
+            document.getElementById('live_face_base64').value = '';
+            startCamera();
+        }
+
+        /**
+         * Validate that the live face capture has been completed before form submission
+         */
+        function validateVerificationForm(e) {
+            var faceData = document.getElementById('live_face_base64').value;
+            if (!faceData || faceData.trim() === '') {
+                e.preventDefault();
+                alert('Please start your webcam and click "Capture Face" to take a live photo before submitting.');
+                return false;
+            }
+            return true;
+        }
+
+        // Release camera when leaving page
+        window.addEventListener('beforeunload', function() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+            }
+        });
+    </script>
+{% endblock %}

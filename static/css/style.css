@@ -1637,3 +1637,154 @@ textarea {
         padding: 2rem 1.5rem;
     }
 }
+
+/* ======================= STAFF SUMMARY CARDS ======================= */
+.staff-card {
+    background: #ffffff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    transition: all 0.25s ease;
+    border-left: 5px solid #1a1a1a;
+}
+
+.staff-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    border-color: #ddd;
+}
+
+.staff-card.card-pending {
+    border-left-color: #ffc107;
+}
+
+.staff-card.card-approved {
+    border-left-color: #28a745;
+}
+
+.staff-card.card-calendar {
+    border-left-color: #C41E3A;
+}
+
+.staff-card.card-total {
+    border-left-color: #1a1a1a;
+}
+
+.staff-card-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.staff-card-content {
+    flex: 1;
+}
+
+.staff-card-number {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: #1a1a1a;
+    line-height: 1.1;
+    margin-bottom: 0.25rem;
+}
+
+.staff-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #555;
+    margin-bottom: 0.25rem;
+}
+
+.staff-card-hint {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #C41E3A;
+}
+
+/* ======================= CLICKABLE INQUIRIES & DETAILS ======================= */
+.inquiry-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.inquiry-row:hover {
+    background-color: #fdf5f6 !important;
+}
+
+.btn-view-details {
+    background-color: #8B0000;
+    color: #ffffff;
+    border: 1px solid #8B0000;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.82rem;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-view-details:hover {
+    background-color: #C41E3A;
+    border-color: #C41E3A;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(196, 30, 58, 0.25);
+}
+
+.service-tag {
+    background-color: #fdf5f6;
+    color: #8B0000;
+    border: 1px solid #f5c6cb;
+    padding: 0.35rem 0.85rem;
+    border-radius: 20px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ======================= STAFF PROFILE VERIFICATION BADGES ======================= */
+.verification-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.35rem 0.95rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.badge-verified {
+    background-color: #e6f9e6;
+    color: #1e7e34;
+    border: 1px solid #b7eb8f;
+}
+
+.badge-pending {
+    background-color: #fff9e6;
+    color: #b08a00;
+    border: 1px solid #ffe58f;
+}
+
+.badge-unverified {
+    background-color: #fdf3f4;
+    color: #c41e3a;
+    border: 1px solid #ffa39e;
+}

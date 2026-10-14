@@ -1,0 +1,139 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Manage Inquiries | FIPConnect{% endblock %}
+
+{% block head %}
+    <style>
+        .inquiry-row {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .inquiry-row:hover {
+            background-color: #fdf5f6 !important;
+        }
+
+        .btn-view-details {
+            background-color: #8B0000;
+            color: #ffffff;
+            border: 1px solid #8B0000;
+            padding: 0.35rem 0.8rem;
+            font-size: 0.82rem;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-view-details:hover {
+            background-color: #C41E3A;
+            border-color: #C41E3A;
+            color: #ffffff;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(196, 30, 58, 0.25);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Client Inquiries Management</h2>
+            <p class="section-subtitle" style="text-align: left; margin-bottom: 0;">Review submitted event requests, click any row or the View Details button to open the full specifications.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('staff_calendar') }}" class="btn btn-outline" style="padding: 0.6rem 1.25rem; font-size: 0.9rem;">
+                &#128197; View in Calendar
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="filter-bar" style="justify-content: flex-start; margin-bottom: 1.75rem;">
+        <a href="{{ url_for('staff_inquiries', status='all') }}" class="filter-tab {{ 'active' if status_filter == 'all' }}">All Requests</a>
+        <a href="{{ url_for('staff_inquiries', status='Pending') }}" class="filter-tab {{ 'active' if status_filter == 'Pending' }}">&#9203; Pending Review</a>
+        <a href="{{ url_for('staff_inquiries', status='Approved') }}" class="filter-tab {{ 'active' if status_filter == 'Approved' }}">&#10004; Approved Events</a>
+        <a href="{{ url_for('staff_inquiries', status='Declined') }}" class="filter-tab {{ 'active' if status_filter == 'Declined' }}">&#10008; Declined</a>
+    </div>
+
+    <!-- Inquiries Modern Data Table -->
+    {% if inquiries %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tracking Code</th>
+                    <th>Client Information</th>
+                    <th>Event Details</th>
+                    <th>Date & Time</th>
+                    <th>Location / Venue</th>
+                    <th>Guests</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inq in inquiries %}
+                <tr class="inquiry-row" onclick="handleRowClick(event, '{{ url_for('staff_inquiry_detail', inquiry_id=inq.id) }}')">
+                    <td class="code-cell">
+                        {{ inq.tracking_code }}
+                    </td>
+                    <td>
+                        <strong>{{ inq.client_name }}</strong><br>
+                        <small style="color: #555;">&#128222; {{ inq.phone }}</small><br>
+                        <small style="color: #777;">&#9993; {{ inq.email }}</small>
+                    </td>
+                    <td><strong style="color: #1a1a1a;">{{ inq.event_type }}</strong></td>
+                    <td><strong>{{ inq.event_date }}</strong><br><small style="color: #666;">&#9200; {{ inq.event_time }}</small></td>
+                    <td><span>{{ inq.venue }}</span></td>
+                    <td class="center">{{ inq.guest_count }}</td>
+                    <td><span class="status-badge status-{{ inq.status | lower }}">{{ inq.status }}</span></td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <!-- Dedicated Clickable View Details Button -->
+                        <a href="{{ url_for('staff_inquiry_detail', inquiry_id=inq.id) }}" class="btn-view-details" title="View Full Client Specifications">
+                            View Details &rarr;
+                        </a>
+
+                        {% if inq.status == 'Pending' %}
+                            <form method="POST" action="{{ url_for('update_status', inquiry_id=inq.id) }}" class="inline-form" style="margin-left: 4px;">
+                                <input type="hidden" name="status" value="Approved">
+                                <button type="submit" class="btn btn-approve btn-sm" title="Approve this booking">&#10004;</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('update_status', inquiry_id=inq.id) }}" class="inline-form">
+                                <input type="hidden" name="status" value="Declined">
+                                <button type="submit" class="btn btn-decline btn-sm" title="Decline this booking">&#10008;</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if inq.details %}
+                <tr class="details-row">
+                    <td colspan="8"><em>Notes:</em> {{ inq.details | truncate(110) }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#128203;</div>
+        <p>No inquiries found{% if status_filter != 'all' %} with status "{{ status_filter }}"{% endif %}.</p>
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        function handleRowClick(event, targetUrl) {
+            // Prevent triggering row navigation if clicked inside interactive elements
+            if (event.target.closest('button, a, input, form')) {
+                return;
+            }
+            window.location.href = targetUrl;
+        }
+    </script>
+{% endblock %}

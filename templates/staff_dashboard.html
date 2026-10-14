@@ -1,0 +1,143 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Staff Dashboard | FIPConnect{% endblock %}
+
+{% block content %}
+    <div class="staff-header-row" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Hello Staff {{ session.get('full_name') or session.get('name') or session.get('team_fullname', 'Member') }}</h2>
+            <p class="section-subtitle" style="text-align: left; margin-bottom: 0;">Monitor and process incoming event inquiries, client requests, and production schedules.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('staff_inquiries') }}" class="btn btn-outline" style="padding: 0.6rem 1.25rem; font-size: 0.9rem;">
+                &#128203; View All Inquiries
+            </a>
+            <a href="{{ url_for('staff_calendar') }}" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-size: 0.9rem;">
+                &#128197; Open Event Calendar
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary KPI Cards (Clickable) -->
+    <div class="staff-kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
+        
+        <!-- 1. Pending Inquiries (Clickable -> Inquiries filtered by Pending) -->
+        <a href="{{ url_for('staff_inquiries', status='Pending') }}" class="staff-card card-pending" title="Click to review pending inquiries">
+            <div class="staff-card-icon" style="background-color: #fff8e6; color: #b08a00;">
+                &#9203;
+            </div>
+            <div class="staff-card-content">
+                <div class="staff-card-number">{{ summary.pending }}</div>
+                <div class="staff-card-title">Pending Inquiries to Review</div>
+                <div class="staff-card-hint">Needs staff attention &rarr;</div>
+            </div>
+        </a>
+
+        <!-- 2. Approved Events (Clickable -> Inquiries filtered by Approved) -->
+        <a href="{{ url_for('staff_inquiries', status='Approved') }}" class="staff-card card-approved" title="Click to view approved events">
+            <div class="staff-card-icon" style="background-color: #eafaf1; color: #28a745;">
+                &#10004;
+            </div>
+            <div class="staff-card-content">
+                <div class="staff-card-number">{{ summary.approved }}</div>
+                <div class="staff-card-title">Approved Events</div>
+                <div class="staff-card-hint">Ready for production &rarr;</div>
+            </div>
+        </a>
+
+        <!-- 3. Upcoming Events This Month (Clickable -> Calendar) -->
+        <a href="{{ url_for('staff_calendar') }}" class="staff-card card-calendar" title="Click to view schedule calendar">
+            <div class="staff-card-icon" style="background-color: #fbebee; color: #C41E3A;">
+                &#128197;
+            </div>
+            <div class="staff-card-content">
+                <div class="staff-card-number">{{ summary.this_month }}</div>
+                <div class="staff-card-title">Upcoming This Month</div>
+                <div class="staff-card-hint">Open calendar view &rarr;</div>
+            </div>
+        </a>
+
+        <!-- 4. Total Inquiries (Clickable -> All Inquiries) -->
+        <a href="{{ url_for('staff_inquiries', status='all') }}" class="staff-card card-total" title="Click to view all inquiries">
+            <div class="staff-card-icon" style="background-color: #f3f4f6; color: #1a1a1a;">
+                &#128203;
+            </div>
+            <div class="staff-card-content">
+                <div class="staff-card-number">{{ summary.total }}</div>
+                <div class="staff-card-title">Total Lifetime Inquiries</div>
+                <div class="staff-card-hint">View full history &rarr;</div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Recent Submissions Section -->
+    <div style="margin-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <h3 style="margin: 0; color: #1a1a1a; font-size: 1.25rem;">
+                Recent Inquiry Submissions
+            </h3>
+            <a href="{{ url_for('staff_inquiries') }}" style="color: #C41E3A; font-weight: 600; text-decoration: none; font-size: 0.9rem;">
+                View All Inquiries &rarr;
+            </a>
+        </div>
+
+        {% if recent_inquiries %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tracking Code</th>
+                        <th>Client</th>
+                        <th>Event Type</th>
+                        <th>Date & Time</th>
+                        <th>Venue</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inq in recent_inquiries %}
+                    <tr>
+                        <td class="code-cell">{{ inq.tracking_code }}</td>
+                        <td>
+                            <strong>{{ inq.client_name }}</strong><br>
+                            <small>{{ inq.phone }}</small>
+                        </td>
+                        <td><strong>{{ inq.event_type }}</strong></td>
+                        <td>
+                            {{ inq.event_date }}<br>
+                            <small style="color: #666;">&#9200; {{ inq.event_time }}</small>
+                        </td>
+                        <td>{{ inq.venue }}</td>
+                        <td>
+                            <span class="status-badge status-{{ inq.status | lower }}">
+                                {{ inq.status }}
+                            </span>
+                        </td>
+                        <td style="text-align: right;">
+                            {% if inq.status == 'Pending' %}
+                                <form method="POST" action="{{ url_for('update_status', inquiry_id=inq.id) }}" class="inline-form">
+                                    <input type="hidden" name="status" value="Approved">
+                                    <button type="submit" class="btn btn-approve btn-sm" title="Approve">&#10004;</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('update_status', inquiry_id=inq.id) }}" class="inline-form">
+                                    <input type="hidden" name="status" value="Declined">
+                                    <button type="submit" class="btn btn-decline btn-sm" title="Decline">&#10008;</button>
+                                </form>
+                            {% else %}
+                                <span class="text-muted" style="font-size: 0.85rem;">Processed</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">&#128203;</div>
+            <p>No client inquiries submitted yet.</p>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Event Schedules | FIPConnect{% endblock %}
+
+{% block content %}
+    <h2 class="section-title" style="text-align: left;">Event Schedules</h2>
+    <p class="section-subtitle" style="text-align: left;">Confirmed bookings and production timeline for upcoming events.</p>
+
+    {% if schedules %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date & Time</th>
+                    <th>Event Type</th>
+                    <th>Client Information</th>
+                    <th>Venue</th>
+                    <th>Guests</th>
+                    <th>Tracking Code</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in schedules %}
+                <tr>
+                    <td style="white-space: nowrap;">
+                        <strong style="color: #1a1a1a;">{{ event.event_date }}</strong><br>
+                        <small style="color: #666;">&#9200; {{ event.event_time }}</small>
+                    </td>
+                    <td>
+                        <strong>{{ event.event_type }}</strong>
+                    </td>
+                    <td>
+                        <strong>{{ event.client_name }}</strong><br>
+                        <small>{{ event.phone }}</small><br>
+                        <small>{{ event.email }}</small>
+                    </td>
+                    <td>
+                        {{ event.venue }}
+                    </td>
+                    <td class="center">
+                        {{ event.guest_count }}
+                    </td>
+                    <td class="code-cell">
+                        {{ event.tracking_code }}
+                    </td>
+                    <td>
+                        <span class="status-badge status-approved">
+                            {{ event.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% if event.details %}
+                <tr class="details-row">
+                    <td colspan="7">
+                        <em>Production Notes:</em> {{ event.details }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#128197;</div>
+        <p>No confirmed event schedules found yet.</p>
+        <p style="font-size: 0.9rem; color: #777;">When staff marks an inquiry as "Approved", it will automatically be placed on this schedule.</p>
+    </div>
+    {% endif %}
+{% endblock %}
