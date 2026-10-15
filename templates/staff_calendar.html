@@ -9,10 +9,10 @@
         /* FullCalendar Custom Theming for FIPConnect */
         .fc {
             background-color: #fff;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 18px rgba(0,0,0,0.05);
-            border: 1px solid #e8e8e8;
+            padding: 1.75rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid #eaeaea;
             font-family: inherit;
         }
 
@@ -28,7 +28,7 @@
             color: #fff;
             font-weight: 600;
             border-radius: 6px;
-            padding: 0.4rem 0.9rem;
+            padding: 0.45rem 1rem;
             transition: all 0.2s ease;
         }
 
@@ -53,6 +53,15 @@
             border-color: #f0f0f0;
         }
 
+        .fc .fc-day-today {
+            background-color: rgba(196, 30, 58, 0.05) !important;
+        }
+
+        .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+            color: #8B0000 !important;
+            font-weight: 800;
+        }
+
         .fc-col-header-cell {
             background-color: #fafafa;
             padding: 0.6rem 0;
@@ -65,18 +74,22 @@
 
         .fc-event {
             cursor: pointer;
-            border-radius: 4px;
-            padding: 2px 4px;
+            border-radius: 6px;
+            padding: 3px 6px;
             font-weight: 600;
             font-size: 0.85rem;
+            background-color: #8B0000 !important;
+            border-color: #8B0000 !important;
             border-left: 4px solid #C41E3A !important;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            transition: transform 0.15s ease;
+            color: #ffffff !important;
+            box-shadow: 0 3px 8px rgba(139, 0, 0, 0.2);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
 
         .fc-event:hover {
-            transform: scale(1.02);
-            filter: brightness(1.1);
+            transform: translateY(-1px);
+            filter: brightness(1.08);
+            box-shadow: 0 5px 12px rgba(139, 0, 0, 0.3);
         }
 
         /* Event Details Modal */

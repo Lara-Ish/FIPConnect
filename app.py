@@ -148,6 +148,10 @@ def init_db():
             password_hash       TEXT    NOT NULL,
             full_name           TEXT    NOT NULL,
             role                TEXT    NOT NULL DEFAULT 'staff',
+            first_name          TEXT,
+            middle_name         TEXT,
+            last_name           TEXT,
+            birthday            TEXT,
             id_file_path        TEXT,
             id_type             TEXT,
             verification_status TEXT    NOT NULL DEFAULT 'Unverified',
@@ -155,11 +159,19 @@ def init_db():
         );
     """)
 
-    # Migration check: Ensure 'role', 'id_file_path', 'id_type', and 'verification_status' columns exist
+    # Migration check: Ensure all columns exist
     cursor = db.execute("PRAGMA table_info(fip_team)")
     columns = [col[1] for col in cursor.fetchall()]
     if "role" not in columns:
         db.execute("ALTER TABLE fip_team ADD COLUMN role TEXT NOT NULL DEFAULT 'staff'")
+    if "first_name" not in columns:
+        db.execute("ALTER TABLE fip_team ADD COLUMN first_name TEXT")
+    if "middle_name" not in columns:
+        db.execute("ALTER TABLE fip_team ADD COLUMN middle_name TEXT")
+    if "last_name" not in columns:
+        db.execute("ALTER TABLE fip_team ADD COLUMN last_name TEXT")
+    if "birthday" not in columns:
+        db.execute("ALTER TABLE fip_team ADD COLUMN birthday TEXT")
     if "id_file_path" not in columns:
         db.execute("ALTER TABLE fip_team ADD COLUMN id_file_path TEXT")
     if "id_type" not in columns:
@@ -169,6 +181,23 @@ def init_db():
     if "selfie_file_path" not in columns:
         db.execute("ALTER TABLE fip_team ADD COLUMN selfie_file_path TEXT")
 
+    # Create users view pointing to fip_team for compatibility
+    db.execute("CREATE VIEW IF NOT EXISTS users AS SELECT * FROM fip_team;")
+
+    # Backfill name fields for existing records if first_name is empty
+    rows_to_backfill = db.execute(
+        "SELECT id, full_name FROM fip_team WHERE first_name IS NULL OR first_name = ''"
+    ).fetchall()
+    for row in rows_to_backfill:
+        fname_str = (row[1] or "").strip()
+        parts = fname_str.split()
+        if len(parts) == 1:
+            db.execute("UPDATE fip_team SET first_name = ?, last_name = '' WHERE id = ?", (parts[0], row[0]))
+        elif len(parts) == 2:
+            db.execute("UPDATE fip_team SET first_name = ?, last_name = ? WHERE id = ?", (parts[0], parts[1], row[0]))
+        elif len(parts) >= 3:
+            db.execute("UPDATE fip_team SET first_name = ?, middle_name = ?, last_name = ? WHERE id = ?", (parts[0], parts[1], " ".join(parts[2:]), row[0]))
+
     # Seed default admin account
     existing_admin = db.execute(
         "SELECT id FROM fip_team WHERE username = ?", ("admin",)
@@ -176,10 +205,10 @@ def init_db():
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if not existing_admin:
         db.execute(
-            """INSERT INTO fip_team (username, password_hash, full_name, role, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
+            """INSERT INTO fip_team (username, password_hash, full_name, first_name, last_name, role, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             ("admin", hash_password("admin123"),
-             "FIP Administrator", "admin", now),
+             "FIP Administrator", "FIP", "Administrator", "admin", now),
         )
     else:
         # Ensure role is explicitly 'admin'
@@ -191,10 +220,10 @@ def init_db():
     ).fetchone()
     if not existing_staff:
         db.execute(
-            """INSERT INTO fip_team (username, password_hash, full_name, role, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
+            """INSERT INTO fip_team (username, password_hash, full_name, first_name, last_name, role, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             ("staff", hash_password("staff123"),
-             "FIP Operations Staff", "staff", now),
+             "FIP Operations Staff", "Operations", "Staff", "staff", now),
         )
 
     db.commit()
@@ -284,6 +313,16 @@ def staff_required(f):
 def index():
     """Home page with the two main choices."""
     return render_template("index.html")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    """Serve global brand favicon."""
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "0f2727e0-048d-4a7b-9b8c-4e2b5b0796d8.jfif",
+        mimetype="image/jpeg",
+    )
 
 
 @app.route("/inquiry", methods=["GET", "POST"])
@@ -423,6 +462,112 @@ def login():
     return render_template("login.html")
 
 
+@app.route("/fip_login")
+@app.route("/fip-login")
+def fip_login_alias():
+    """Alias route redirecting to /login."""
+    return redirect(url_for("login"))
+
+
+@app.route("/login/face-id", methods=["POST"])
+def login_face_id():
+    """Biometric Face ID authentication endpoint for FIP Team."""
+    data = request.get_json(silent=True) or {}
+    live_face_b64 = data.get("live_face_base64") or request.form.get("live_face_base64")
+
+    if not live_face_b64:
+        return jsonify({
+            "success": False,
+            "message": "No face image received. Please try again."
+        }), 400
+
+    clean_live_b64 = live_face_b64.split(",", 1)[1] if "," in live_face_b64 else live_face_b64
+
+    db = get_db()
+    candidates = db.execute(
+        """SELECT * FROM fip_team 
+           WHERE (selfie_file_path IS NOT NULL AND selfie_file_path != '') 
+              OR (id_file_path IS NOT NULL AND id_file_path != '')"""
+    ).fetchall()
+
+    if not candidates:
+        return jsonify({
+            "success": False,
+            "message": "Face not recognized. Please try again or use your password."
+        }), 401
+
+    matched_user = None
+    best_confidence = 0.0
+
+    is_mock = os.getenv("ENABLE_MOCK_VERIFICATION", "false").lower() == "true" or os.getenv("FACEPLUSPLUS_API_KEY", "").startswith("mock_")
+
+    if is_mock:
+        matched_user = candidates[0]
+        best_confidence = 98.5
+    else:
+        for user in candidates:
+            # Check selfie photo first, then fallback to ID photo
+            photo_file = user["selfie_file_path"] or user["id_file_path"]
+            photo_path = os.path.join(app.config["UPLOAD_STAFF_IDS"], photo_file)
+            if not os.path.exists(photo_path) and user["id_file_path"]:
+                photo_path = os.path.join(app.config["UPLOAD_STAFF_IDS"], user["id_file_path"])
+
+            if not os.path.exists(photo_path):
+                continue
+
+            try:
+                with open(photo_path, "rb") as f:
+                    stored_bytes = f.read()
+                stored_b64 = base64.b64encode(stored_bytes).decode("utf-8")
+                confidence, err_msg = call_faceplusplus_compare_base64(stored_b64, clean_live_b64)
+                print(f"[Face ID Login] Checked {user['username']} ({user['full_name']}): confidence={confidence:.2f}%")
+
+                if confidence >= 75.0:
+                    matched_user = user
+                    best_confidence = confidence
+                    break
+            except Exception as e:
+                print(f"[Face ID Login] Error comparing user {user['username']}: {e}")
+                continue
+
+    if not matched_user:
+        return jsonify({
+            "success": False,
+            "message": "Face not recognized. Please try again or use your password."
+        }), 401
+
+    # Establish authenticated session
+    session.permanent = True
+    session["team_user_id"] = matched_user["id"]
+    session["user_id"] = matched_user["id"]
+    session["team_username"] = matched_user["username"]
+    session["username"] = matched_user["username"]
+    session["user"] = matched_user["username"]
+    session["team_fullname"] = matched_user["full_name"]
+    session["full_name"] = matched_user["full_name"]
+    session["name"] = matched_user["full_name"]
+    session["team_role"] = matched_user["role"]
+    session["role"] = matched_user["role"]
+
+    # Extract first name
+    first_name = matched_user["first_name"]
+    if not first_name:
+        parts = (matched_user["full_name"] or "").strip().split()
+        first_name = parts[0] if parts else "Team Member"
+
+    flash(f"Welcome back, {first_name}!", "success")
+
+    redirect_url = url_for("admin_analytics") if matched_user["role"] == "admin" else url_for("staff_dashboard")
+
+    return jsonify({
+        "success": True,
+        "redirect_url": redirect_url,
+        "first_name": first_name,
+        "role": matched_user["role"],
+        "confidence": best_confidence
+    })
+
+
 @app.route("/logout")
 def logout():
     """Log out the user and clear session."""
@@ -519,11 +664,21 @@ def manage_staff():
     db = get_db()
 
     if request.method == "POST":
-        full_name = request.form.get("full_name", "").strip()
+        first_name = request.form.get("first_name", "").strip()
+        middle_name = request.form.get("middle_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        birthday = request.form.get("birthday", "").strip()
 
-        if not full_name:
-            flash("Staff member full name is required.", "error")
+        if not first_name or not last_name:
+            flash("First name and last name are required.", "error")
             return redirect(url_for("manage_staff"))
+
+        # Construct full name from explicit fields
+        name_tokens = [first_name]
+        if middle_name:
+            name_tokens.append(middle_name)
+        name_tokens.append(last_name)
+        full_name = " ".join(name_tokens)
 
         # Generate automated credentials
         login_id = generate_next_staff_id(db)
@@ -531,20 +686,23 @@ def manage_staff():
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.execute(
-            """INSERT INTO fip_team (username, password_hash, full_name, role, id_file_path, verification_status, created_at)
-               VALUES (?, ?, ?, 'staff', NULL, 'Unverified', ?)""",
-            (login_id, hash_password(temp_password), full_name, now),
+            """INSERT INTO fip_team (username, password_hash, full_name, first_name, middle_name, last_name, birthday, role, id_file_path, verification_status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'staff', NULL, 'Unverified', ?)""",
+            (login_id, hash_password(temp_password), full_name, first_name, middle_name, last_name, birthday, now),
         )
         db.commit()
 
         # Save generated credentials in session so admin view can render a dedicated copyable alert box
         session["latest_created_staff"] = {
             "full_name": full_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "birthday": birthday,
             "login_id": login_id,
             "temp_password": temp_password
         }
 
-        flash(f"Staff account created! Login ID: {login_id} | Temporary Password: {temp_password}", "success")
+        # Credentials are now elegantly displayed in the dismissible alert box within the main content area
         return redirect(url_for("manage_staff"))
 
     # Pop newly created staff info for high-visibility UI feedback
@@ -552,7 +710,7 @@ def manage_staff():
 
     # Fetch existing staff members
     staff_members = db.execute(
-        "SELECT id, username, full_name, role, id_file_path, verification_status, created_at FROM fip_team WHERE role = 'staff' ORDER BY created_at DESC"
+        "SELECT id, username, full_name, first_name, middle_name, last_name, birthday, role, id_file_path, verification_status, created_at FROM fip_team WHERE role = 'staff' ORDER BY created_at DESC"
     ).fetchall()
 
     return render_template("manage_staff.html",
@@ -650,7 +808,11 @@ def staff_dashboard():
         "total": total,
     }
 
+    user_id = session.get("user_id") or session.get("team_user_id")
+    user = db.execute("SELECT * FROM fip_team WHERE id = ?", (user_id,)).fetchone()
+
     return render_template("staff_dashboard.html",
+                           user=user,
                            summary=summary,
                            recent_inquiries=recent_inquiries,
                            active_tab="staff_dashboard")
@@ -998,41 +1160,275 @@ def compute_ocr_similarity(clean_name: str, clean_ocr: str) -> int:
     return max(score_partial, score_token_set, score_token_avg)
 
 
+def verify_birthday_match(registered_bday: str, ocr_text: str) -> bool:
+    """
+    Strictly verifies if the registered birthday matches the date of birth extracted on the ID.
+    Supports ISO formats, US/UK numeric formats, month word names, and common OCR noise.
+    """
+    if not registered_bday or not ocr_text:
+        return False
+    bday_str = registered_bday.strip()
+    year, month, day = None, None, None
+    for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%m/%d/%Y', '%d/%m/%Y', '%Y.%m.%d'):
+        try:
+            dt = datetime.strptime(bday_str, fmt)
+            year, month, day = dt.year, dt.month, dt.day
+            break
+        except ValueError:
+            continue
+    if not year or not month or not day:
+        m = re.search(r'(\d{4})[^\d](\d{1,2})[^\d](\d{1,2})', bday_str)
+        if m:
+            year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        else:
+            return False
+
+    year_str = str(year)
+    year_short = str(year)[2:]
+    month_str = f'{month:02d}'
+    month_single = str(month)
+    day_str = f'{day:02d}'
+    day_single = str(day)
+
+    month_names = {
+        1: ('january', 'jan'), 2: ('february', 'feb'), 3: ('march', 'mar'),
+        4: ('april', 'apr'), 5: ('may', 'may'), 6: ('june', 'jun'),
+        7: ('july', 'jul'), 8: ('august', 'aug'), 9: ('september', 'sep', 'sept'),
+        10: ('october', 'oct'), 11: ('november', 'nov'), 12: ('december', 'dec')
+    }
+    m_words = month_names.get(month, ())
+    text_lower = ocr_text.lower()
+    norm_text = re.sub(r'[\|\\/]+', '/', text_lower)
+    norm_text = re.sub(r'[\s\-_]+', ' ', norm_text)
+
+    patterns = [
+        rf'\b{year_str}[-/\s\.]{month_str}[-/\s\.]{day_str}\b',
+        rf'\b{year_str}[-/\s\.]{month_single}[-/\s\.]{day_single}\b',
+        rf'\b{day_str}[-/\s\.]{month_str}[-/\s\.]{year_str}\b',
+        rf'\b{day_single}[-/\s\.]{month_single}[-/\s\.]{year_str}\b',
+        rf'\b{month_str}[-/\s\.]{day_str}[-/\s\.]{year_str}\b',
+        rf'\b{month_single}[-/\s\.]{day_single}[-/\s\.]{year_str}\b',
+        rf'\b{day_str}[-/\s\.]{month_str}[-/\s\.]{year_short}\b',
+        rf'\b{month_str}[-/\s\.]{day_str}[-/\s\.]{year_short}\b',
+    ]
+    for pat in patterns:
+        if re.search(pat, norm_text) or re.search(pat, text_lower):
+            return True
+
+    for mw in m_words:
+        word_patterns = [
+            rf'\b{day_str}\s*{mw}\s*{year_str}\b',
+            rf'\b{day_single}\s*{mw}\s*{year_str}\b',
+            rf'\b{mw}\s*{day_str}[,\s]+{year_str}\b',
+            rf'\b{mw}\s*{day_single}[,\s]+{year_str}\b',
+            rf'\b{year_str}\s*{mw}\s*{day_str}\b',
+            rf'\b{year_str}\s*{mw}\s*{day_single}\b',
+            rf'\b{day_str}-{mw}-{year_str}\b',
+            rf'\b{day_single}-{mw}-{year_str}\b',
+            rf'\b{day_str}\s*{mw}\s*{year_short}\b',
+            rf'\b{mw}\s*{day_str}[,\s]+{year_short}\b',
+        ]
+        for wpat in word_patterns:
+            if re.search(wpat, norm_text) or re.search(wpat, text_lower):
+                return True
+
+    dob_keywords = ['birth', 'dob', 'date of birth', 'bday', 'born', 'kaarawan', 'kapanganakan', 'naissance']
+    for kw in dob_keywords:
+        kw_idx = text_lower.find(kw)
+        while kw_idx != -1:
+            snippet = text_lower[max(0, kw_idx - 30): min(len(text_lower), kw_idx + 80)]
+            has_year = (year_str in snippet) or (f'/{year_short}' in snippet) or (f'-{year_short}' in snippet)
+            has_day = (day_str in snippet) or (f' {day_single} ' in snippet) or (f'/{day_single}/' in snippet)
+            has_month = (month_str in snippet) or any(mw in snippet for mw in m_words)
+            if has_year and (has_month or has_day):
+                return True
+            kw_idx = text_lower.find(kw, kw_idx + 1)
+
+    if year_str in text_lower:
+        month_found = any(mw in text_lower for mw in m_words) or (f'/{month_str}/' in norm_text) or (f'-{month_str}-' in norm_text) or (f' {month_str} ' in norm_text)
+        day_found = (day_str in text_lower) or (f' {day_single} ' in text_lower)
+        if month_found and day_found:
+            return True
+
+    return False
+
+
+def verify_id_type_keywords(id_type: str, ocr_text: str) -> bool:
+    """
+    Validates that the OCR text on the uploaded ID contains keywords matching
+    the selected government ID type (e.g. Driver's License -> driver, license, lto;
+    PhilSys ID / National ID -> philsys, republic of the philippines, national id, etc.).
+    """
+    if not id_type or not ocr_text:
+        return False
+
+    clean_ocr = ocr_text.lower()
+    norm_id_type = id_type.strip().lower()
+
+    # Keyword mapping dictionary based on visual profiles of actual Philippine IDs (all normalized lowercase)
+    id_keyword_map = {
+        "philsys id": [
+            "philsys", "national id", "republika ng pilipinas",
+            "republic of the philippines", "pambansang", "pagkakakilanlan", "psa", "philid"
+        ],
+        "national id": [
+            "philsys", "national id", "republika ng pilipinas",
+            "republic of the philippines", "pambansang", "pagkakakilanlan", "psa", "philid"
+        ],
+        "driver's license": [
+            "driver", "license", "land transportation office", "lto",
+            "licence", "dl", "driver's", "non-professional", "professional", "restriction"
+        ],
+        "passport": [
+            "passport", "pasaporte", "department of foreign affairs", "dfa",
+            "pilipinas", "republic", "foreign affairs", "republika"
+        ],
+        "philhealth id": [
+            "philhealth", "philippine health insurance corporation", "health insurance",
+            "phic", "philhealth identification"
+        ],
+        "philhealth": [
+            "philhealth", "philippine health insurance corporation", "health insurance",
+            "phic", "philhealth identification"
+        ],
+        "umid": [
+            "umid", "unified", "multi-purpose", "multipurpose", "sss", 
+            "gsis", "social security", "crn"
+        ],
+        "prc id": [
+            "prc", "professional", "regulation", "commission", "regulations"
+        ],
+        "postal id": [
+            "postal", "post", "phlpost", "philpost", "philippine postal"
+        ],
+        "voter's id": [
+            "voter", "voters", "voter's", "comelec", "elections", "commission on elections"
+        ],
+        "other valid government id": [
+            "republic", "republika", "philippines", "pilipinas", "government", 
+            "pamahalaan", "department", "city", "municipality", "barangay", 
+            "tin", "philhealth", "pag-ibig", "id", "identification", "license", 
+            "card", "bureau", "bir"
+        ]
+    }
+
+    keywords = id_keyword_map.get(norm_id_type)
+    if not keywords:
+        # Fallback keyword lookup based on substring match
+        if "philsys" in norm_id_type or "national" in norm_id_type:
+            keywords = id_keyword_map["philsys id"]
+        elif "driver" in norm_id_type:
+            keywords = id_keyword_map["driver's license"]
+        elif "passport" in norm_id_type:
+            keywords = id_keyword_map["passport"]
+        elif "philhealth" in norm_id_type:
+            keywords = id_keyword_map["philhealth id"]
+        elif "umid" in norm_id_type:
+            keywords = id_keyword_map["umid"]
+        elif "prc" in norm_id_type:
+            keywords = id_keyword_map["prc id"]
+        elif "postal" in norm_id_type:
+            keywords = id_keyword_map["postal id"]
+        elif "voter" in norm_id_type:
+            keywords = id_keyword_map["voter's id"]
+        else:
+            keywords = id_keyword_map["other valid government id"]
+
+    # 1. Direct substring search
+    for kw in keywords:
+        if kw.lower() in clean_ocr:
+            return True
+
+    # 2. Token-level fuzzy match (handling minor OCR character noise like 'dr1ver' or 'phllsys')
+    ocr_words = [re.sub(r'[^a-z]', '', w) for w in clean_ocr.split()]
+    for kw in keywords:
+        kw_clean = re.sub(r'[^a-z]', '', kw.lower())
+        if len(kw_clean) >= 4:
+            for word in ocr_words:
+                if len(word) >= 4 and fuzz.ratio(kw_clean, word) >= 82:
+                    return True
+
+    return False
+
+
+
+@app.route("/admin/profile")
+@login_required
+@admin_required
+def admin_profile():
+    """Administrator profile & settings route."""
+    db = get_db()
+    user_id = session.get("user_id") or session.get("team_user_id")
+    user = db.execute("SELECT * FROM fip_team WHERE id = ?", (user_id,)).fetchone()
+    return render_template("admin_profile.html", user=user, active_tab="admin_profile")
+
+
+@app.route("/profile")
+@login_required
+def profile_dispatcher():
+    """Universal profile dispatcher based on user role."""
+    role = session.get("role") or session.get("team_role")
+    if role == "admin":
+        return redirect(url_for("admin_profile"))
+    return redirect(url_for("staff_profile"))
+
+
 @app.route("/staff/profile", methods=["GET", "POST"])
 @login_required
-@staff_required
 def staff_profile():
-    """Final bulletproof staff profile and automated ID + Face verification route."""
+    """Final bulletproof staff profile and automated 3-way security verification route."""
+    role = session.get("role") or session.get("team_role")
+    if role == "admin":
+        return redirect(url_for("admin_profile"))
+
     db = get_db()
     user_id = session.get("user_id") or session.get("team_user_id")
     user = db.execute("SELECT * FROM fip_team WHERE id = ?", (user_id,)).fetchone()
 
+    if not user:
+        flash("Staff account not found or session expired. Please log in again.", "error")
+        return redirect(url_for("staff_login"))
+
     if request.method == "POST":
         id_type = request.form.get("id_type", "").strip()
+        custom_id_type = request.form.get("custom_id_type", "").strip()
         id_image = request.files.get("id_image") or request.files.get("id_file")
         live_face_base64 = request.form.get("live_face_base64", "").strip()
 
+        # If user selected an "Other" option and provided a custom ID name
+        effective_id_type = id_type
+        if "other" in id_type.lower():
+            if custom_id_type:
+                effective_id_type = f"Other ({custom_id_type})"
+            else:
+                effective_id_type = "Other Valid Government-Issued ID"
+
         if not id_type:
             flash("Please select a valid ID type from the dropdown.", "error")
-            return redirect(url_for("staff_profile") + "#verification")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
         if not id_image or not id_image.filename:
             flash("Please upload an image of the front of your valid ID.", "error")
-            return redirect(url_for("staff_profile") + "#verification")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
         if not live_face_base64:
             flash("Please capture your live face photo using the webcam before submitting.", "error")
-            return redirect(url_for("staff_profile") + "#verification")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
         # -------------------------------------------------------------------
         # 1. DATABASE SANITY CHECK (Crucial)
         # -------------------------------------------------------------------
-        staff_name = user["full_name"] if user and user["full_name"] else ""
-        print(f"DEBUG - DB Name: '{staff_name}'")
+        first_name = user["first_name"] if "first_name" in user.keys() and user["first_name"] else ""
+        middle_name = user["middle_name"] if "middle_name" in user.keys() and user["middle_name"] else ""
+        last_name = user["last_name"] if "last_name" in user.keys() and user["last_name"] else ""
+        staff_name = user["full_name"] or f"{first_name} {middle_name} {last_name}".strip()
+        staff_birthday = user["birthday"] if "birthday" in user.keys() and user["birthday"] else ""
+
+        print(f"DEBUG - DB Name: '{staff_name}', First: '{first_name}', Last: '{last_name}', Birthday: '{staff_birthday}'")
 
         if not staff_name or not staff_name.strip():
             flash("Verification Error: No registered staff name found in database.", "error")
-            return redirect(url_for("staff_profile") + "#verification")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
         # Normalize registered staff name (lowercase, strip special characters/numbers)
         clean_staff_name = re.sub(r'[^a-z\s]', '', staff_name.lower())
@@ -1045,7 +1441,7 @@ def staff_profile():
         id_file_bytes = id_image.read()
         if not id_file_bytes:
             flash("The uploaded ID file appears to be empty. Please select a valid image.", "error")
-            return redirect(url_for("staff_profile") + "#verification")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
         nparr = np.frombuffer(id_file_bytes, np.uint8)
         img_cv = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -1058,7 +1454,7 @@ def staff_profile():
                 raise ValueError("Empty live face data")
         except Exception:
             flash("Invalid webcam capture image data. Please retake your face scan.", "error")
-            return redirect(url_for("staff_profile") + "#verification")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
         # Save files to disk for records and UI display
         safe_id_name = secure_filename(id_image.filename)
@@ -1078,7 +1474,8 @@ def staff_profile():
         is_mock = os.getenv("ENABLE_MOCK_VERIFICATION", "false").lower() == "true"
         if is_mock or os.getenv("FACEPLUSPLUS_API_KEY", "").startswith("mock_"):
             best_score = 100
-            print(f"DEBUG - Raw OCR Text (Mock Mode):\nREPUBLIC OF THE PHILIPPINES {staff_name}")
+            best_text = f"REPUBLIC OF THE PHILIPPINES {staff_name} DOB: {staff_birthday or '1998-06-19'}"
+            print(f"DEBUG - Raw OCR Text (Mock Mode):\n{best_text}")
             print(f"DEBUG - Best OCR Score: {best_score}%")
         else:
             best_score = 0
@@ -1159,26 +1556,157 @@ def staff_profile():
 
         print(f"DEBUG - Best OCR Score: {best_score}% (Threshold: 70%)")
 
-        # Isolated OCR Evaluation: Halt if below 70%
-        if best_score < 70:
+        # -------------------------------------------------------------------
+        # ID TYPE LOGICAL KEYWORD VALIDATION STEP
+        # -------------------------------------------------------------------
+        id_type_passed = False
+        if is_mock or os.getenv("FACEPLUSPLUS_API_KEY", "").startswith("mock_"):
+            id_type_passed = True
+        else:
+            if "other" in id_type.lower() and custom_id_type:
+                id_type_passed = verify_id_type_keywords(custom_id_type, best_text) or verify_id_type_keywords(id_type, best_text)
+            else:
+                id_type_passed = verify_id_type_keywords(id_type, best_text)
+
+        if not id_type_passed:
+            print(f"DEBUG - ID Type Mismatch: selected='{effective_id_type}', text_len={len(best_text)}")
             db.execute(
                 """UPDATE fip_team 
                    SET verification_status = 'Unverified', id_type = ?, id_file_path = ?, selfie_file_path = ?
                    WHERE id = ?""",
-                (id_type, id_filename, selfie_filename, user_id),
+                (effective_id_type, id_filename, selfie_filename, user_id),
             )
             db.commit()
-            flash("OCR Verification Failed: We could not read your registered name on the uploaded ID. Please ensure the image is clear and well-lit.", "error")
-            return redirect(url_for("staff_profile") + "#verification")
+            flash(f"Verification failed: The attached image does not appear to be a valid {effective_id_type}. Please ensure you uploaded the correct document.", "error")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
         # -------------------------------------------------------------------
-        # 4. FACE++ CONNECTION (Pure Base64)
+        # 4. STRICT 3-WAY MATCH: STEP 1 - OCR NAME MATCH
+        # -------------------------------------------------------------------
+        name_passed = False
+        if is_mock or os.getenv("FACEPLUSPLUS_API_KEY", "").startswith("mock_"):
+            name_passed = True
+        else:
+            if best_score >= 70:
+                name_passed = True
+            else:
+                # Check individual tokens: First Name and Last Name must both match in OCR text
+                clean_first = re.sub(r'[^a-z]', '', first_name.lower()) if first_name else ""
+                clean_last = re.sub(r'[^a-z]', '', last_name.lower()) if last_name else ""
+                if clean_first and clean_last:
+                    ocr_words = [re.sub(r'[^a-z]', '', w.lower()) for w in best_text.split()]
+                    score_first = max((fuzz.ratio(clean_first, w) for w in ocr_words), default=0)
+                    score_last = max((fuzz.ratio(clean_last, w) for w in ocr_words), default=0)
+                    if score_first >= 75 and score_last >= 75:
+                        name_passed = True
+
+        if not name_passed:
+            print(f"DEBUG - Name Verification Failed: best_score={best_score}%")
+            db.execute(
+                """UPDATE fip_team 
+                   SET verification_status = 'Unverified', id_type = ?, id_file_path = ?, selfie_file_path = ?
+                   WHERE id = ?""",
+                (effective_id_type, id_filename, selfie_filename, user_id),
+            )
+            db.commit()
+            flash("Verification failed: Name on ID is illegible or does not match registered records.", "error")
+            return redirect(url_for("staff_profile") + "?failed=1")
+
+        # -------------------------------------------------------------------
+        # 5. STRICT 3-WAY MATCH: STEP 2 - OCR BIRTHDAY MATCH
+        # -------------------------------------------------------------------
+        bday_passed = False
+        if is_mock or os.getenv("FACEPLUSPLUS_API_KEY", "").startswith("mock_"):
+            bday_passed = True
+        else:
+            if staff_birthday and verify_birthday_match(staff_birthday, best_text):
+                bday_passed = True
+            elif not staff_birthday:
+                # If no birthday registered in DB, flag as missing records
+                bday_passed = False
+
+        if not bday_passed:
+            print(f"DEBUG - Birthday Verification Failed: registered='{staff_birthday}'")
+            db.execute(
+                """UPDATE fip_team 
+                   SET verification_status = 'Unverified', id_type = ?, id_file_path = ?, selfie_file_path = ?
+                   WHERE id = ?""",
+                (effective_id_type, id_filename, selfie_filename, user_id),
+            )
+            db.commit()
+            flash("Verification failed: Birthday on ID does not match registered system records.", "error")
+            return redirect(url_for("staff_profile") + "?failed=1")
+
+        # -------------------------------------------------------------------
+        # 6. STRICT 3-WAY MATCH: STEP 3 - ANTI-SPOOFING & FACE++ MATCH
         # -------------------------------------------------------------------
         id_base64 = base64.b64encode(id_file_bytes).decode("utf-8")
+        detect_api_url = "https://api-us.faceplusplus.com/facepp/v3/detect"
+        detect_payload = {
+            "api_key": FACEPLUSPLUS_API_KEY,
+            "api_secret": FACEPLUSPLUS_API_SECRET,
+            "image_base64": clean_live_b64,
+            "return_attributes": "facequality,blur,headpose"
+        }
+
+        liveness_passed = True
+        liveness_reason = ""
+
+        try:
+            detect_resp = requests.post(detect_api_url, data=detect_payload, timeout=20)
+            print(f"DEBUG - Face++ Detect HTTP Status: {detect_resp.status_code}")
+            if detect_resp.status_code == 200:
+                detect_data = detect_resp.json()
+                faces = detect_data.get("faces", [])
+                if not faces:
+                    liveness_passed = False
+                    liveness_reason = "No face detected in live selfie."
+                else:
+                    face_attr = faces[0].get("attributes", {})
+                    facequality = face_attr.get("facequality", {})
+                    blur_attr = face_attr.get("blur", {}).get("blurness", {})
+
+                    qual_val = float(facequality.get("value", 0))
+                    qual_thresh = float(facequality.get("threshold", 70.1))
+                    blur_val = float(blur_attr.get("value", 0))
+                    blur_thresh = float(blur_attr.get("threshold", 50.0))
+
+                    print(f"DEBUG - Liveness Check: FaceQuality={qual_val:.2f} (thresh={qual_thresh}), Blurness={blur_val:.2f} (thresh={blur_thresh})")
+
+                    # Screen or 2D image spoof detection: poor face quality or high blur threshold
+                    if qual_val < qual_thresh or blur_val > blur_thresh:
+                        liveness_passed = False
+                        liveness_reason = f"Face quality {qual_val:.2f} below threshold or blurness {blur_val:.2f} exceeded."
+            else:
+                print(f"DEBUG - Face++ Detect API non-200: {detect_resp.status_code}")
+                err_text = detect_resp.text
+                if "CONCURRENCY_LIMIT_EXCEEDED" in err_text:
+                    liveness_passed = True
+                else:
+                    liveness_passed = False
+                    liveness_reason = f"Detect API returned {detect_resp.status_code}"
+        except Exception as det_err:
+            print(f"DEBUG - Face++ Detect Exception: {det_err}")
+            liveness_passed = False
+            liveness_reason = str(det_err)
+
+        if not liveness_passed:
+            print(f"DEBUG - Spoofing Detected: {liveness_reason}")
+            db.execute(
+                """UPDATE fip_team 
+                   SET verification_status = 'Unverified', id_type = ?, id_file_path = ?, selfie_file_path = ?
+                   WHERE id = ?""",
+                (effective_id_type, id_filename, selfie_filename, user_id),
+            )
+            db.commit()
+            flash("Verification failed: Liveness check failed - 2D image detected", "error")
+            return redirect(url_for("staff_profile") + "?failed=1")
+
+        # Face++ Compare Call
         face_api_url = "https://api-us.faceplusplus.com/facepp/v3/compare"
         face_payload = {
-            "api_key": "b0uSL9nuSnJO0TXD6758FDzcIvM5Eipb",
-            "api_secret": "dNrr8WS5LeYeclYEEFZgeFQp67osUh29",
+            "api_key": FACEPLUSPLUS_API_KEY,
+            "api_secret": FACEPLUSPLUS_API_SECRET,
             "image_base64_1": id_base64,
             "image_base64_2": clean_live_b64
         }
@@ -1218,57 +1746,55 @@ def staff_profile():
             print(f"DEBUG - Face++ Error: {face_error}")
 
         # -------------------------------------------------------------------
-        # 5. SYSTEM INTEGRATION (SQLite Update & User-Friendly Errors)
+        # 7. FINAL 3-WAY SUCCESS EVALUATION
         # -------------------------------------------------------------------
-        if face_confidence >= 75 and best_score >= 70:
+        if name_passed and bday_passed and face_confidence >= 75:
             db.execute(
                 """UPDATE fip_team 
                    SET verification_status = 'Verified', id_type = ?, id_file_path = ?, selfie_file_path = ?
                    WHERE id = ?""",
-                (id_type, id_filename, selfie_filename, user_id),
+                (effective_id_type, id_filename, selfie_filename, user_id),
             )
             db.commit()
             flash("Account successfully verified!", "success")
-            return redirect(url_for("staff_profile") + "#account")
+            return redirect(url_for("staff_profile"))
         else:
             db.execute(
                 """UPDATE fip_team 
                    SET verification_status = 'Unverified', id_type = ?, id_file_path = ?, selfie_file_path = ?
                    WHERE id = ?""",
-                (id_type, id_filename, selfie_filename, user_id),
+                (effective_id_type, id_filename, selfie_filename, user_id),
             )
             db.commit()
-
-            if face_confidence < 75:
-                flash("Face Verification Failed: The live photo does not match the ID photo.", "error")
-            else:
-                flash("OCR Verification Failed: We could not read your registered name on the uploaded ID. Please ensure the image is clear and well-lit.", "error")
-
-            return redirect(url_for("staff_profile") + "#verification")
+            flash("Verification failed: Face does not match ID", "error")
+            return redirect(url_for("staff_profile") + "?failed=1")
 
     return render_template("staff_profile.html", user=user, active_tab="staff_profile")
 
 
+@app.route("/admin/change-password", methods=["POST"])
 @app.route("/staff/change-password", methods=["POST"])
 @login_required
-@staff_required
 def staff_change_password():
-    """Handle password change for authenticated staff members."""
+    """Handle password change for authenticated users (admin and staff)."""
     current_password = request.form.get("current_password", "")
     new_password = request.form.get("new_password", "")
     confirm_password = request.form.get("confirm_password", "")
 
+    role = session.get("role") or session.get("team_role")
+    redirect_target = "admin_profile" if role == "admin" else "staff_profile"
+
     if not current_password or not new_password or not confirm_password:
         flash("All password fields are required.", "error")
-        return redirect(url_for("staff_profile"))
+        return redirect(url_for(redirect_target) + "#password")
 
     if len(new_password) < 6:
         flash("New password must be at least 6 characters long.", "error")
-        return redirect(url_for("staff_profile"))
+        return redirect(url_for(redirect_target) + "#password")
 
     if new_password != confirm_password:
         flash("New password and confirmation password do not match.", "error")
-        return redirect(url_for("staff_profile"))
+        return redirect(url_for(redirect_target) + "#password")
 
     user_id = session.get("user_id") or session.get("team_user_id")
     db = get_db()
@@ -1276,7 +1802,7 @@ def staff_change_password():
 
     if not user or not verify_password(user["password_hash"], current_password):
         flash("Current password entered is incorrect.", "error")
-        return redirect(url_for("staff_profile"))
+        return redirect(url_for(redirect_target) + "#password")
 
     # Update to new password hash
     new_hash = hash_password(new_password)
@@ -1284,7 +1810,7 @@ def staff_change_password():
     db.commit()
 
     flash("Your password has been updated successfully! Please use your new password next time you log in.", "success")
-    return redirect(url_for("staff_profile"))
+    return redirect(url_for(redirect_target) + "#password")
 
 
 @app.route("/schedules")

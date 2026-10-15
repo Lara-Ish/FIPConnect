@@ -1,0 +1,330 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Admin Settings & Profile | FIPConnect{% endblock %}
+
+{% block head %}
+    <style>
+        .profile-container {
+            max-width: 1100px;
+            margin: 0;
+        }
+
+        /* --- 2-Column Responsive Layout --- */
+        .profile-layout {
+            display: grid;
+            grid-template-columns: 290px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* --- Left Column: Vertical Navigation --- */
+        .profile-nav-col {
+            position: sticky;
+            top: 1.5rem;
+        }
+
+        .vertical-tabs-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #ffffff;
+            padding: 1.25rem;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+        }
+
+        .nav-group-title {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #888888;
+            letter-spacing: 0.75px;
+            margin-bottom: 0.5rem;
+            padding-left: 0.25rem;
+        }
+
+        /* Default Vertical Button State */
+        .vertical-tab-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.95rem 1.15rem;
+            background-color: #f8f9fa;
+            color: #1a1a1a;
+            border: 1px solid #e2e2e2;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.22s ease-in-out;
+        }
+
+        /* Hover State */
+        .vertical-tab-btn:hover {
+            background-color: #C41E3A;
+            color: #ffffff;
+            border-color: #C41E3A;
+            transform: translateX(4px);
+        }
+
+        /* Active Button State */
+        .vertical-tab-btn.active {
+            background-color: #C41E3A;
+            color: #ffffff;
+            border-color: #C41E3A;
+            box-shadow: 0 4px 14px rgba(196, 30, 58, 0.28);
+        }
+
+        .vertical-tab-btn .tab-icon {
+            font-size: 1.15rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .vertical-tab-btn .tab-label {
+            flex: 1;
+            line-height: 1.35;
+        }
+
+        /* --- Right Column: Content Section --- */
+        .profile-content-col {
+            min-width: 0;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+            animation: fadeInTab 0.22s ease-out;
+        }
+
+        @keyframes fadeInTab {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Card container styles */
+        .profile-card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+            padding: 2.25rem 2.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .profile-card-title {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            color: #1a1a1a;
+            font-size: 1.3rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #f2f2f2;
+            padding-bottom: 0.75rem;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem 2rem;
+        }
+
+        .profile-item-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #777;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.35rem;
+        }
+
+        .profile-item-val {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 860px) {
+            .profile-layout {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .profile-nav-col {
+                position: static;
+            }
+
+            .profile-card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="profile-container">
+        <!-- Page Header -->
+        <div style="margin-bottom: 2rem;">
+            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Admin Settings & Profile</h2>
+            <p class="section-subtitle" style="text-align: left; margin-bottom: 0;">Manage your administrator account credentials and update security settings.</p>
+        </div>
+
+        <!-- 2-Column Vertical Layout -->
+        <div class="profile-layout">
+            
+            <!-- Left Column: Vertical Navigation Menu -->
+            <aside class="profile-nav-col">
+                <div class="vertical-tabs-nav" role="tablist">
+                    <div class="nav-group-title">Account Settings</div>
+                    
+                    <button type="button" class="vertical-tab-btn active" id="tabBtnAccount" onclick="showTab('accountTab', this)">
+                        <span class="tab-icon">&#128100;</span>
+                        <span class="tab-label">Account Information</span>
+                    </button>
+                    
+                    <button type="button" class="vertical-tab-btn" id="tabBtnPassword" onclick="showTab('passwordTab', this)">
+                        <span class="tab-icon">&#128274;</span>
+                        <span class="tab-label">Change Password</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Right Column: Content Area -->
+            <div class="profile-content-col">
+                
+                <!-- Container 1: Account Information (Visible by Default) -->
+                <div id="accountTab" class="tab-pane active">
+                    <div class="profile-card">
+                        <h3 class="profile-card-title">
+                            <span>&#128100;</span> Administrator Information
+                        </h3>
+
+                        <div class="profile-grid">
+                            <div>
+                                <div class="profile-item-label">Full Name</div>
+                                <div class="profile-item-val">{{ user.full_name }}</div>
+                            </div>
+
+                            <div>
+                                <div class="profile-item-label">Admin Username</div>
+                                <div class="profile-item-val"><code>{{ user.username }}</code></div>
+                            </div>
+
+                            <div>
+                                <div class="profile-item-label">System Access Level</div>
+                                <div class="profile-item-val">
+                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.82rem; font-weight: 700; background-color: #f6ffed; color: #237804; border: 1px solid #b7eb8f;">
+                                        &#10004; Full Administrative Access
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #f0f0f0; color: #666; font-size: 0.92rem; display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #28a745; font-size: 1.1rem;">&#128737;</span>
+                            <span>This account holds root administrative privileges over the FIPConnect management system.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Container 2: Change Password (Hidden by Default) -->
+                <div id="passwordTab" class="tab-pane">
+                    <div class="profile-card">
+                        <h3 class="profile-card-title">
+                            <span style="color: #C41E3A;">&#128274;</span> Change Administrator Password
+                        </h3>
+                        <p style="color: #666; font-size: 0.95rem; margin-top: -0.5rem; margin-bottom: 1.5rem;">
+                            Ensure your administrative account remains protected by maintaining a strong, unique password.
+                        </p>
+
+                        <form method="POST" action="{{ url_for('staff_change_password') }}">
+                            <div class="form-group" style="margin-bottom: 1.25rem;">
+                                <label for="current_password" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                    Current Password <span style="color: #C41E3A;">*</span>
+                                </label>
+                                <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter your current administrator password" required style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                            </div>
+
+                            <div class="form-row" style="display: flex; gap: 1.5rem; margin-bottom: 1.75rem; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 250px;">
+                                    <label for="new_password" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                        New Password <span style="color: #C41E3A;">*</span>
+                                    </label>
+                                    <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Minimum 6 characters" required minlength="6" style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                                </div>
+                                <div class="form-group" style="flex: 1; min-width: 250px;">
+                                    <label for="confirm_password" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                        Confirm New Password <span style="color: #C41E3A;">*</span>
+                                    </label>
+                                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Re-enter new password" required minlength="6" style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                                </div>
+                            </div>
+
+                            <div style="text-align: right;">
+                                <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2rem; font-size: 1rem;">
+                                    &#128274; Update Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        /**
+         * Switches between vertical tab panes and manages active button state.
+         * @param {string} tabId - Target container ID ('accountTab', 'passwordTab')
+         * @param {HTMLElement} btnElement - The clicked vertical button element
+         */
+        function showTab(tabId, btnElement) {
+            var panes = document.querySelectorAll('.tab-pane');
+            panes.forEach(function(pane) {
+                pane.classList.remove('active');
+            });
+
+            var buttons = document.querySelectorAll('.vertical-tab-btn');
+            buttons.forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+
+            var targetPane = document.getElementById(tabId);
+            if (targetPane) {
+                targetPane.classList.add('active');
+            }
+
+            if (btnElement) {
+                btnElement.classList.add('active');
+            }
+        }
+
+        // Support direct navigation to password tab via URL hash (#password)
+        document.addEventListener('DOMContentLoaded', function() {
+            var hash = window.location.hash;
+            if (hash === '#password') {
+                showTab('passwordTab', document.getElementById('tabBtnPassword'));
+            }
+        });
+    </script>
+{% endblock %}

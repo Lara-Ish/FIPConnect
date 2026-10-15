@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Admin | FIPConnect{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-transparent.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block head %}{% endblock %}
 </head>
@@ -64,16 +65,12 @@
                             <span class="sidebar-text">Settings</span>
                         </a>
                         <div class="dropdown-content" id="settingsDropdown">
-                            <div style="padding: 10px 14px; font-size: 0.85rem; border-bottom: 1px solid #eee; color: #555; text-align: left;">
-                                <strong style="color: #1a1a1a;">{{ session.get('team_fullname', session.get('team_username', 'User')) }}</strong><br>
-                                <span style="font-size: 0.75rem; color: #C41E3A; font-weight: bold; text-transform: uppercase;">Role: {{ session.get('role', session.get('team_role', 'Staff')) }}</span>
-                            </div>
-                            {% if session.get('role') != 'admin' and session.get('team_role') != 'admin' %}
-                            <a href="{{ url_for('staff_profile') }}" style="border-bottom: 1px solid #f2f2f2; font-size: 0.9rem; text-align: left; padding: 10px 14px;">
-                                &#128100; Profile
-                            </a>
+                            {% if session.get('role') == 'admin' or session.get('team_role') == 'admin' %}
+                            <a href="{{ url_for('admin_profile') }}" style="color: #000000; font-weight: 600; text-align: left; display: block; padding: 10px 16px; text-decoration: none; border-bottom: 1px solid #f0f0f0;">Profile</a>
+                            {% else %}
+                            <a href="{{ url_for('staff_profile') }}" style="color: #000000; font-weight: 600; text-align: left; display: block; padding: 10px 16px; text-decoration: none; border-bottom: 1px solid #f0f0f0;">Profile</a>
                             {% endif %}
-                            <a href="{{ url_for('logout') }}">&#9211; Logout</a>
+                            <a href="{{ url_for('logout') }}" style="color: #000000; font-weight: 600; text-align: left; display: block; padding: 10px 16px; text-decoration: none;">Logout</a>
                         </div>
                     </div>
                 </li>
@@ -83,6 +80,7 @@
         <!-- ===== MAIN CONTENT ===== -->
         <main class="admin-main">
             <!-- Flash messages -->
+            {% block flash_messages %}
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="flash-messages">
@@ -92,6 +90,7 @@
                     </div>
                 {% endif %}
             {% endwith %}
+            {% endblock %}
 
             {% block content %}{% endblock %}
         </main>

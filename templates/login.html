@@ -4,7 +4,90 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FIP Team Login | FIPConnect</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-transparent.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .webcam-mirrored {
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1);
+        }
+
+        .face-guide-oval {
+            width: 175px;
+            height: 225px;
+            border: 2.5px dashed rgba(255, 255, 255, 0.75);
+            border-radius: 50%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 12px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.28);
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .face-guide-oval.detected {
+            border: 2.5px solid #28a745;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.22);
+        }
+
+        .face-guide-oval.liveness-passed {
+            border: 3px solid #10b981 !important;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.22), 0 0 20px rgba(16, 185, 129, 0.5) !important;
+        }
+
+        .face-guide-badge {
+            color: #ffffff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 3px 10px;
+            border-radius: 12px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: background 0.25s ease;
+        }
+
+        .face-guide-oval.detected .face-guide-badge {
+            background: rgba(40, 167, 69, 0.92);
+        }
+
+        .face-guide-oval.liveness-passed .face-guide-badge {
+            background: rgba(16, 185, 129, 0.95) !important;
+        }
+
+        @keyframes countdownPulse {
+            0% { transform: scale(0.85); opacity: 0.9; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.85); opacity: 0.9; }
+        }
+
+        .face-id-btn {
+            background: #fff5f5;
+            border: 2px solid #C41E3A;
+            color: #C41E3A;
+            font-weight: 700;
+            padding: 0.85rem 1.5rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 8px rgba(196, 30, 58, 0.08);
+            margin-top: 1rem;
+            font-size: 1rem;
+        }
+
+        .face-id-btn:hover {
+            background: #C41E3A;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(196, 30, 58, 0.2);
+        }
+    </style>
 </head>
 <body>
 
@@ -20,11 +103,11 @@
     </nav>
 
     <main class="container login-container">
-        <div class="login-card">
+        <div class="login-card" style="max-width: 480px;">
             <div class="login-header">
-                <div class="login-icon">&#128274;</div>
-                <h2>FIP Team Login</h2>
-                <p>Sign in to access the production dashboard.</p>
+                <div class="login-icon" id="loginHeaderIcon">&#128274;</div>
+                <h2 id="loginHeaderTitle">FIP Team Login</h2>
+                <p id="loginHeaderSubtitle">Sign in to access the production dashboard.</p>
             </div>
 
             <!-- Flash messages -->
@@ -36,25 +119,635 @@
                 {% endif %}
             {% endwith %}
 
-            <form method="POST" action="{{ url_for('login') }}">
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username"
-                           placeholder="Enter your username" required autofocus>
+            <!-- ================= Standard Password Login Form ================= -->
+            <div id="passwordLoginForm">
+                <form method="POST" action="{{ url_for('login') }}">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username"
+                               placeholder="Enter your username" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password"
+                               placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg btn-block">Sign In</button>
+                </form>
+
+                <!-- Divider and Face ID Button -->
+                <div style="display: flex; align-items: center; margin: 1.75rem 0 1.25rem;">
+                    <div style="flex: 1; border-bottom: 1px solid #e2e8f0;"></div>
+                    <span style="padding: 0 12px; color: #a0aec0; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">or</span>
+                    <div style="flex: 1; border-bottom: 1px solid #e2e8f0;"></div>
                 </div>
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password"
-                           placeholder="Enter your password" required>
+
+                <button type="button" class="face-id-btn" id="useFaceIdBtn" onclick="switchToFaceIdLogin()">
+                    <span style="font-size: 1.3rem; line-height: 1;">&#128100;</span>
+                    <span>Use Face ID</span>
+                </button>
+            </div>
+
+            <!-- ================= Face ID Biometric Login View ================= -->
+            <div id="faceIdLoginContainer" style="display: none;">
+                <!-- Mirrored Webcam Container with Oval Guide and Countdown Overlay -->
+                <div id="faceIdVideoContainer" style="position: relative; width: 100%; max-width: 380px; margin: 0 auto; overflow: hidden; border-radius: 12px; background: #111; box-shadow: 0 6px 20px rgba(0,0,0,0.12);">
+                    <!-- Mirrored Video Feed -->
+                    <video id="faceIdVideo" class="webcam-mirrored" autoplay playsinline muted style="width: 100%; max-height: 280px; object-fit: cover; display: block; border-radius: 12px; border: 2px solid #C41E3A;"></video>
+
+                    <!-- Centered Head Guide Oval Overlay -->
+                    <div id="faceIdGuideOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; align-items: center; justify-content: center; z-index: 5;">
+                        <div id="faceIdGuideOval" class="face-guide-oval">
+                            <span id="faceIdGuideBadge" class="face-guide-badge">Position Face Here</span>
+                        </div>
+                    </div>
+
+                    <!-- Countdown Overlay -->
+                    <div id="faceIdCountdownOverlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; background: rgba(0, 0, 0, 0.65); z-index: 10; align-items: center; justify-content: center; flex-direction: column;">
+                        <div id="faceIdCountdownNumber" style="font-size: 5rem; font-weight: 900; color: #ffffff; text-shadow: 0 4px 18px rgba(0,0,0,0.85); line-height: 1; animation: countdownPulse 0.9s ease infinite;">
+                            3
+                        </div>
+                        <div id="faceIdCountdownSubtext" style="color: #ffffff; font-size: 0.95rem; font-weight: 700; margin-top: 0.5rem; text-shadow: 0 2px 6px rgba(0,0,0,0.8); text-align: center; padding: 0 1rem;">
+                            Perfect! Capturing in 3... 2... 1...
+                        </div>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary btn-lg btn-block">Sign In</button>
-            </form>
+
+                <!-- Single Clean Dynamic Feedback Text -->
+                <div id="faceIdFeedback" style="margin-top: 1rem; font-size: 1.05rem; font-weight: 700; color: #4a5568; min-height: 1.6rem; text-align: center; transition: color 0.2s ease;">
+                    Camera initializing...
+                </div>
+
+                <!-- Dedicated Error Alert Container -->
+                <div id="faceIdErrorAlert" class="alert alert-error" style="display: none; margin-top: 1rem; text-align: center; font-size: 0.92rem; line-height: 1.4;">
+                    Face not recognized. Please try again or use your password.
+                </div>
+
+                <!-- Hidden Canvas -->
+                <canvas id="faceIdCanvas" style="display: none;"></canvas>
+
+                <!-- Action Controls -->
+                <div style="margin-top: 1.25rem; display: flex; gap: 10px; flex-direction: column;">
+                    <button type="button" id="retryFaceIdBtn" class="btn btn-primary btn-block" onclick="retryFaceIdScan()" style="display: none; font-weight: 700;">
+                        <span>&#128260;</span> Try Face ID Again
+                    </button>
+                    <button type="button" class="btn btn-outline btn-block" onclick="switchToPasswordLogin()" style="font-weight: 600; padding: 0.75rem 1.5rem;">
+                        Cancel / Use Password
+                    </button>
+                </div>
+            </div>
+
         </div>
     </main>
 
     <footer class="footer">
         <p>&copy; 2026 Flare Infinity Productions &mdash; FIPConnect v1.0</p>
     </footer>
+
+    <!-- Face-API Client Library -->
+    <script src="{{ url_for('static', filename='js/face-api.min.js') }}"></script>
+    <script>
+        if (typeof faceapi === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"><\/script>');
+        }
+    </script>
+
+    <script>
+        var faceIdStream = null;
+        var faceIdInterval = null;
+        var faceIdCountdownTimer = null;
+        var faceIdCountdown = 3;
+        var faceIdIsCountingDown = false;
+        var faceIdCaptured = false;
+        var faceIdModelsLoaded = false;
+        var faceIdModelsLoading = false;
+
+        var consecutiveValidFrames = 0;
+        var prevFacePos = null;
+        var motionHistory = [];
+        var MAX_HISTORY = 15;
+
+        // Strict 50-50 & Clarity Thresholds
+        var MIN_CLARITY_SCORE = 0.85;
+        var MIN_MOVEMENT = 0.25;
+        var MAX_MOVEMENT = 8.5;
+        var MIN_3D_YAW_SPAN = 0.007;
+        var PHONE_SPOOF_XY_SPAN = 2.0;
+        var PHONE_SPOOF_YAW_LOCK = 0.0055;
+
+        /**
+         * Load Face-API neural models for Face ID Login
+         */
+        async function loadFaceIdModels() {
+            if (faceIdModelsLoaded) return true;
+            if (faceIdModelsLoading) {
+                while (faceIdModelsLoading) {
+                    await new Promise(function(r) { setTimeout(r, 100); });
+                }
+                return faceIdModelsLoaded;
+            }
+            faceIdModelsLoading = true;
+
+            var feedback = document.getElementById('faceIdFeedback');
+            if (feedback) {
+                feedback.textContent = 'Loading AI models...';
+                feedback.style.color = '#d97706';
+            }
+
+            var LOCAL_PATH = '/static/models';
+            var CDN_PATH = 'https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights';
+
+            try {
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(LOCAL_PATH),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(LOCAL_PATH)
+                ]);
+                faceIdModelsLoaded = true;
+            } catch (err) {
+                try {
+                    await Promise.all([
+                        faceapi.nets.tinyFaceDetector.loadFromUri(CDN_PATH),
+                        faceapi.nets.faceLandmark68Net.loadFromUri(CDN_PATH)
+                    ]);
+                    faceIdModelsLoaded = true;
+                } catch (cdnErr) {
+                    console.error('[Face ID] Model load failed:', cdnErr);
+                    faceIdModelsLoaded = false;
+                }
+            } finally {
+                faceIdModelsLoading = false;
+            }
+            return faceIdModelsLoaded;
+        }
+
+        /**
+         * Switch from standard Username/Password form to Face ID view
+         */
+        async function switchToFaceIdLogin() {
+            document.getElementById('passwordLoginForm').style.display = 'none';
+            document.getElementById('faceIdLoginContainer').style.display = 'block';
+            document.getElementById('faceIdErrorAlert').style.display = 'none';
+            document.getElementById('retryFaceIdBtn').style.display = 'none';
+
+            var title = document.getElementById('loginHeaderTitle');
+            var subtitle = document.getElementById('loginHeaderSubtitle');
+            var icon = document.getElementById('loginHeaderIcon');
+            if (title) title.textContent = 'Face ID Login';
+            if (subtitle) subtitle.textContent = 'Position your face inside the oval to sign in.';
+            if (icon) icon.innerHTML = '&#128100;';
+
+            await startFaceIdCamera();
+        }
+
+        /**
+         * Switch back to Password form and stop camera completely
+         */
+        function switchToPasswordLogin() {
+            stopFaceIdCamera();
+
+            document.getElementById('faceIdLoginContainer').style.display = 'none';
+            document.getElementById('passwordLoginForm').style.display = 'block';
+
+            var title = document.getElementById('loginHeaderTitle');
+            var subtitle = document.getElementById('loginHeaderSubtitle');
+            var icon = document.getElementById('loginHeaderIcon');
+            if (title) title.textContent = 'FIP Team Login';
+            if (subtitle) subtitle.textContent = 'Sign in to access the production dashboard.';
+            if (icon) icon.innerHTML = '&#128274;';
+        }
+
+        /**
+         * Cleanly stop camera hardware tracks and clear detection loops
+         */
+        function stopFaceIdCamera() {
+            if (faceIdCountdownTimer) {
+                clearInterval(faceIdCountdownTimer);
+                faceIdCountdownTimer = null;
+            }
+            if (faceIdInterval) {
+                clearInterval(faceIdInterval);
+                faceIdInterval = null;
+            }
+
+            var video = document.getElementById('faceIdVideo');
+            if (video) {
+                try { video.pause(); } catch(e) {}
+                video.srcObject = null;
+            }
+
+            if (faceIdStream) {
+                faceIdStream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+                faceIdStream = null;
+            }
+
+            faceIdIsCountingDown = false;
+            faceIdCaptured = false;
+            consecutiveValidFrames = 0;
+            motionHistory = [];
+            prevFacePos = null;
+            faceIdCountdown = 3;
+
+            var overlay = document.getElementById('faceIdCountdownOverlay');
+            if (overlay) overlay.style.display = 'none';
+
+            var oval = document.getElementById('faceIdGuideOval');
+            if (oval) {
+                oval.classList.remove('detected');
+                oval.classList.remove('liveness-passed');
+            }
+        }
+
+        /**
+         * Retry Face ID Scan after a failure
+         */
+        async function retryFaceIdScan() {
+            document.getElementById('faceIdErrorAlert').style.display = 'none';
+            document.getElementById('retryFaceIdBtn').style.display = 'none';
+            await startFaceIdCamera();
+        }
+
+        /**
+         * Start webcam and begin active face detection loop
+         */
+        async function startFaceIdCamera() {
+            stopFaceIdCamera();
+
+            var feedback = document.getElementById('faceIdFeedback');
+            var video = document.getElementById('faceIdVideo');
+
+            if (feedback) {
+                feedback.textContent = 'Starting camera...';
+                feedback.style.color = '#4a5568';
+            }
+
+            if (!faceIdModelsLoaded) {
+                await loadFaceIdModels();
+            }
+
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Webcam access not supported by browser.");
+                }
+
+                faceIdStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user"
+                    },
+                    audio: false
+                });
+
+                video.srcObject = faceIdStream;
+                await video.play();
+
+                if (feedback) {
+                    feedback.textContent = 'Face not detected clearly';
+                    feedback.style.color = '#4a5568';
+                }
+
+                initFaceIdDetection();
+
+            } catch (err) {
+                console.error('[Face ID] Camera start error:', err);
+                if (feedback) {
+                    feedback.textContent = 'Camera error: ' + (err.message || 'Permission denied.');
+                    feedback.style.color = '#c41e3a';
+                }
+            }
+        }
+
+        /**
+         * Frame-by-frame 3D liveness and 50-50 velocity evaluation
+         */
+        function evaluateFaceIdFrame(detection) {
+            if (!detection || !detection.landmarks) {
+                return { isValid: false, reason: "Face not detected clearly" };
+            }
+
+            var score = (detection.detection && typeof detection.detection.score === 'number')
+                ? detection.detection.score
+                : (detection.score || 0);
+
+            if (score < MIN_CLARITY_SCORE) {
+                return { isValid: false, reason: "Face not detected clearly" };
+            }
+
+            var box = (detection.detection && detection.detection.box)
+                ? detection.detection.box
+                : (detection.box || null);
+            if (!box) {
+                return { isValid: false, reason: "Face not detected clearly" };
+            }
+
+            var cx = box.x + (box.width / 2.0);
+            var cy = box.y + (box.height / 2.0);
+
+            var frameMovement = 0;
+            if (prevFacePos) {
+                var dx = cx - prevFacePos.x;
+                var dy = cy - prevFacePos.y;
+                frameMovement = Math.hypot(dx, dy);
+            }
+            prevFacePos = { x: cx, y: cy };
+
+            if (frameMovement > MAX_MOVEMENT) {
+                return { isValid: false, reason: "Too shaky" };
+            }
+
+            var pts = detection.landmarks.positions;
+            var jawLeft = pts[0];
+            var jawRight = pts[16];
+            var noseTip = pts[30];
+
+            var dLeft = Math.abs(noseTip.x - jawLeft.x);
+            var dRight = Math.abs(jawRight.x - noseTip.x);
+            var yawRatio = dLeft / (dLeft + dRight + 0.0001);
+
+            motionHistory.push({
+                x: cx,
+                y: cy,
+                movement: frameMovement,
+                yawRatio: yawRatio,
+                timestamp: Date.now()
+            });
+
+            if (motionHistory.length > MAX_HISTORY) {
+                motionHistory.shift();
+            }
+
+            if (motionHistory.length >= 8) {
+                var n = motionHistory.length;
+                var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                var minYaw = Infinity, maxYaw = -Infinity;
+                var totalMv = 0;
+
+                for (var i = 0; i < n; i++) {
+                    var h = motionHistory[i];
+                    if (h.x < minX) minX = h.x;
+                    if (h.x > maxX) maxX = h.x;
+                    if (h.y < minY) minY = h.y;
+                    if (h.y > maxY) maxY = h.y;
+                    if (h.yawRatio < minYaw) minYaw = h.yawRatio;
+                    if (h.yawRatio > maxYaw) maxYaw = h.yawRatio;
+                    totalMv += h.movement;
+                }
+
+                var avgMovement = totalMv / n;
+                var xySpan = (maxX - minX) + (maxY - minY);
+                var yawSpan = maxYaw - minYaw;
+
+                if (avgMovement < MIN_MOVEMENT && xySpan < 0.6) {
+                    return { isValid: false, reason: "Stay still / Move slightly" };
+                }
+
+                if (xySpan >= PHONE_SPOOF_XY_SPAN && yawSpan < PHONE_SPOOF_YAW_LOCK) {
+                    return { isValid: false, reason: "Stay still / Move slightly" };
+                }
+
+                if (yawSpan < MIN_3D_YAW_SPAN && avgMovement < 1.0) {
+                    return { isValid: false, reason: "Stay still / Move slightly" };
+                }
+
+                return { isValid: true };
+            }
+
+            return { isValid: true };
+        }
+
+        /**
+         * Reset hook if face conditions fail during detection or countdown
+         */
+        function resetFaceIdCountdown(reason) {
+            consecutiveValidFrames = 0;
+
+            if (faceIdCountdownTimer) {
+                clearInterval(faceIdCountdownTimer);
+                faceIdCountdownTimer = null;
+            }
+
+            faceIdIsCountingDown = false;
+            faceIdCountdown = 3;
+
+            var overlay = document.getElementById('faceIdCountdownOverlay');
+            var numElem = document.getElementById('faceIdCountdownNumber');
+            var subtextElem = document.getElementById('faceIdCountdownSubtext');
+            var oval = document.getElementById('faceIdGuideOval');
+            var badge = document.getElementById('faceIdGuideBadge');
+            var feedback = document.getElementById('faceIdFeedback');
+
+            var displayReason = reason || "Face not detected clearly";
+
+            if (overlay) overlay.style.display = 'none';
+
+            if (oval) {
+                oval.classList.remove('liveness-passed');
+                oval.classList.add('detected');
+            }
+            if (badge) {
+                badge.textContent = displayReason;
+            }
+            if (feedback) {
+                feedback.textContent = displayReason;
+                if (displayReason === 'Too shaky' || displayReason === 'Stay still / Move slightly') {
+                    feedback.style.color = '#d97706';
+                } else if (displayReason === 'Face not detected clearly') {
+                    feedback.style.color = '#c41e3a';
+                } else {
+                    feedback.style.color = '#4a5568';
+                }
+            }
+        }
+
+        /**
+         * Start strict 3-second countdown once face is verified
+         */
+        function startFaceIdCountdown() {
+            if (faceIdIsCountingDown || faceIdCaptured) return;
+            faceIdIsCountingDown = true;
+            faceIdCountdown = 3;
+
+            var overlay = document.getElementById('faceIdCountdownOverlay');
+            var numElem = document.getElementById('faceIdCountdownNumber');
+            var subtextElem = document.getElementById('faceIdCountdownSubtext');
+            var oval = document.getElementById('faceIdGuideOval');
+            var badge = document.getElementById('faceIdGuideBadge');
+            var feedback = document.getElementById('faceIdFeedback');
+
+            var countdownText = "Perfect! Capturing in 3... 2... 1...";
+
+            if (overlay) overlay.style.display = 'flex';
+            if (numElem) {
+                numElem.textContent = '3';
+                numElem.style.color = '#ffffff';
+            }
+            if (subtextElem) {
+                subtextElem.textContent = countdownText;
+            }
+            if (oval) {
+                oval.classList.add('liveness-passed');
+            }
+            if (badge) {
+                badge.textContent = 'Capturing...';
+            }
+            if (feedback) {
+                feedback.textContent = countdownText;
+                feedback.style.color = '#10b981';
+            }
+
+            if (faceIdCountdownTimer) clearInterval(faceIdCountdownTimer);
+            faceIdCountdownTimer = setInterval(function() {
+                faceIdCountdown--;
+                if (faceIdCountdown > 0) {
+                    if (numElem) numElem.textContent = faceIdCountdown;
+                    if (feedback) feedback.textContent = 'Perfect! Capturing in ' + faceIdCountdown + '...';
+                    if (subtextElem) subtextElem.textContent = 'Perfect! Capturing in ' + faceIdCountdown + '...';
+                } else {
+                    clearInterval(faceIdCountdownTimer);
+                    faceIdCountdownTimer = null;
+                    faceIdIsCountingDown = false;
+                    faceIdCaptured = true;
+                    if (overlay) overlay.style.display = 'none';
+                    executeFaceIdCapture();
+                }
+            }, 1000);
+        }
+
+        /**
+         * Active Face-API detection monitoring loop
+         */
+        function initFaceIdDetection() {
+            var video = document.getElementById('faceIdVideo');
+
+            if (faceIdInterval) {
+                clearInterval(faceIdInterval);
+                faceIdInterval = null;
+            }
+
+            var isDetecting = false;
+
+            faceIdInterval = setInterval(async function() {
+                if (!video || video.readyState < 2 || faceIdCaptured) return;
+                if (isDetecting) return;
+                isDetecting = true;
+
+                try {
+                    if (faceIdModelsLoaded && typeof faceapi !== 'undefined') {
+                        var detection = await faceapi.detectSingleFace(
+                            video,
+                            new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.50 })
+                        ).withFaceLandmarks();
+
+                        if (detection && detection.landmarks) {
+                            var evalResult = evaluateFaceIdFrame(detection);
+
+                            if (evalResult.isValid) {
+                                consecutiveValidFrames++;
+                                if (consecutiveValidFrames >= 3 && !faceIdIsCountingDown && !faceIdCaptured) {
+                                    startFaceIdCountdown();
+                                }
+                            } else {
+                                resetFaceIdCountdown(evalResult.reason);
+                            }
+                        } else {
+                            resetFaceIdCountdown("Face not detected clearly");
+                        }
+                    }
+                } catch (err) {
+                    console.error('[Face ID] Detection loop error:', err);
+                } finally {
+                    isDetecting = false;
+                }
+            }, 100);
+        }
+
+        /**
+         * Auto-capture frame, stop stream, and authenticate with backend
+         */
+        async function executeFaceIdCapture() {
+            var video = document.getElementById('faceIdVideo');
+            var canvas = document.getElementById('faceIdCanvas');
+            var feedback = document.getElementById('faceIdFeedback');
+
+            // Draw current video frame to canvas
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            var base64Data = canvas.toDataURL('image/jpeg', 0.95);
+
+            // Cleanly stop hardware camera tracks
+            stopFaceIdCamera();
+
+            if (feedback) {
+                feedback.textContent = 'Recognizing Face ID...';
+                feedback.style.color = '#0056b3';
+            }
+
+            try {
+                var response = await fetch('/login/face-id', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        live_face_base64: base64Data
+                    })
+                });
+
+                var result = await response.json();
+
+                if (response.ok && result.success) {
+                    if (feedback) {
+                        feedback.textContent = 'Welcome back, ' + (result.first_name || 'Team Member') + '! Redirecting...';
+                        feedback.style.color = '#10b981';
+                    }
+                    setTimeout(function() {
+                        window.location.href = result.redirect_url || '/staff/dashboard';
+                    }, 500);
+                } else {
+                    var errorAlert = document.getElementById('faceIdErrorAlert');
+                    var retryBtn = document.getElementById('retryFaceIdBtn');
+
+                    if (errorAlert) {
+                        errorAlert.textContent = result.message || 'Face not recognized. Please try again or use your password.';
+                        errorAlert.style.display = 'block';
+                    }
+                    if (feedback) {
+                        feedback.textContent = 'Face not recognized';
+                        feedback.style.color = '#c41e3a';
+                    }
+                    if (retryBtn) {
+                        retryBtn.style.display = 'block';
+                    }
+                }
+            } catch (netErr) {
+                console.error('[Face ID] Network authentication error:', netErr);
+                var errorAlert = document.getElementById('faceIdErrorAlert');
+                var retryBtn = document.getElementById('retryFaceIdBtn');
+                if (errorAlert) {
+                    errorAlert.textContent = 'Connection error during Face ID verification. Please use your password.';
+                    errorAlert.style.display = 'block';
+                }
+                if (feedback) {
+                    feedback.textContent = 'Connection error';
+                    feedback.style.color = '#c41e3a';
+                }
+                if (retryBtn) {
+                    retryBtn.style.display = 'block';
+                }
+            }
+        }
+
+        // Clean up camera stream when leaving page
+        window.addEventListener('beforeunload', function() {
+            stopFaceIdCamera();
+        });
+    </script>
 
 </body>
 </html>

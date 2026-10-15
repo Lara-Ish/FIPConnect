@@ -3,9 +3,25 @@
 {% block title %}Staff Dashboard | FIPConnect{% endblock %}
 
 {% block content %}
+    <!-- Unverified Staff Warning Banner -->
+    {% if user and user.verification_status != 'Verified' %}
+    <div style="margin-bottom: 1.75rem;">
+        <a href="{{ url_for('staff_profile') }}?verify=1" style="display: flex; align-items: center; justify-content: space-between; background-color: #C41E3A; color: #ffffff; text-decoration: none; padding: 1.1rem 1.6rem; border-radius: 10px; box-shadow: 0 6px 20px rgba(196, 30, 58, 0.28); transition: transform 0.2s ease, background-color 0.2s ease;">
+            <div style="display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 1.02rem;">
+                <span style="font-size: 1.5rem; line-height: 1;">&#9888;</span>
+                <span>Action Required: Your account is not yet verified. Click here to verify your account now.</span>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.2); padding: 0.45rem 1rem; border-radius: 6px; font-size: 0.88rem; font-weight: 700; white-space: nowrap; border: 1px solid rgba(255, 255, 255, 0.4);">
+                Verify Now &rarr;
+            </div>
+        </a>
+    </div>
+    {% endif %}
+
     <div class="staff-header-row" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
         <div>
-            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Hello Staff {{ session.get('full_name') or session.get('name') or session.get('team_fullname', 'Member') }}</h2>
+            {% set staff_fname = (user.first_name if user and user.first_name else (user.full_name.split()[0] if user and user.full_name else session.get('first_name', (session.get('team_fullname', 'Member').split()[0])))) %}
+            <h2 class="section-title" style="text-align: left; margin-bottom: 0.25rem;">Hello, Staff {{ staff_fname }}</h2>
             <p class="section-subtitle" style="text-align: left; margin-bottom: 0;">Monitor and process incoming event inquiries, client requests, and production schedules.</p>
         </div>
         <div style="display: flex; gap: 10px;">

@@ -124,10 +124,11 @@
         </div>
     </div>
 
-    <!-- Automated Credential Generation Feedback Alert for Admin -->
+    <!-- Automated Credential Generation Feedback Alert for Admin (Dismissible) -->
     {% if new_staff_info %}
-    <div id="credentialAlert" class="alert alert-success" style="background-color: #f6ffed; border: 2px solid #b7eb8f; border-radius: 10px; padding: 1.5rem; margin-bottom: 2.25rem; color: #135200; box-shadow: 0 6px 18px rgba(0,0,0,0.06);">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+    <div id="credentialAlert" class="alert alert-success" style="position: relative; background-color: #f6ffed; border: 1.5px solid #b7eb8f; border-left: 5px solid #52c41a; border-radius: 10px; padding: 1.5rem 1.75rem; margin-bottom: 2.25rem; color: #135200; box-shadow: 0 4px 16px rgba(0,0,0,0.06); animation: fadeInModal 0.25s ease;">
+        <button type="button" onclick="document.getElementById('credentialAlert').style.display='none'" style="position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 1.5rem; color: #52c41a; cursor: pointer; line-height: 1;" title="Dismiss">&times;</button>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; padding-right: 1.5rem;">
             <div>
                 <h4 style="margin: 0 0 0.5rem 0; color: #135200; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
                     <span>&#10004;</span> New Staff Account Created for <strong>{{ new_staff_info.full_name }}</strong>
@@ -165,9 +166,9 @@
                 <thead>
                     <tr>
                         <th>Staff Name</th>
+                        <th>Birthday</th>
                         <th>Staff Login ID</th>
-                        <th>Role</th>
-                        <th>Verification ID</th>
+                        <th>Verification Status</th>
                         <th>Created Date</th>
                         <th style="text-align: right;">Action</th>
                     </tr>
@@ -179,18 +180,18 @@
                             <strong>{{ staff.full_name }}</strong>
                         </td>
                         <td>
+                            {{ staff.birthday or 'Not recorded' }}
+                        </td>
+                        <td>
                             <code>{{ staff.username }}</code>
                         </td>
                         <td>
-                            <span class="status-badge status-approved">Staff</span>
-                        </td>
-                        <td>
-                            {% if staff.id_file_path %}
-                                <a href="{{ url_for('view_staff_id', filename=staff.id_file_path) }}" target="_blank" class="btn btn-outline btn-sm" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
-                                    &#128196; View Attached ID
-                                </a>
+                            {% if staff.verification_status == 'Verified' %}
+                                <span class="status-badge status-approved">&#10004; Verified</span>
+                            {% elif staff.verification_status == 'Pending Verification' %}
+                                <span class="status-badge status-pending">&#9203; Pending</span>
                             {% else %}
-                                <span class="text-muted" style="font-size: 0.85rem;">No file uploaded</span>
+                                <span class="status-badge status-declined">&#10008; Unverified</span>
                             {% endif %}
                         </td>
                         <td>
@@ -227,25 +228,43 @@
             
             <form method="POST" action="{{ url_for('manage_staff') }}">
                 <div class="staff-modal-body">
-                    <div class="form-group" style="margin-bottom: 1.5rem;">
-                        <label for="full_name" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
-                            Staff Full Name <span style="color: #C41E3A;">*</span>
-                        </label>
-                        <input type="text" id="full_name" name="full_name" placeholder="e.g. Maria Santos" required style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;">
-                        <small style="display: block; margin-top: 0.5rem; font-size: 0.85rem; color: #666;">
-                            &#128273; The system will automatically generate a sequential <strong>FIPSXXX</strong> Login ID and a randomized 8-character temporary password.
-                        </small>
-                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                        <div class="form-group">
+                            <label for="first_name" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                First Name <span style="color: #C41E3A;">*</span>
+                            </label>
+                            <input type="text" id="first_name" name="first_name" placeholder="e.g. Maria" required style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                        </div>
 
-                    <div class="form-group" style="margin-bottom: 1.5rem;">
-                        <label style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">Assigned Permission Role</label>
-                        <div style="padding: 0.75rem 1rem; background: #fdfdfd; border: 1px solid #ccc; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
-                            <span class="status-badge status-approved" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;">STAFF</span>
-                            <small style="color: #666;">Inquiries & Schedules operations only</small>
+                        <div class="form-group">
+                            <label for="middle_name" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                Middle Name <span style="font-size: 0.8rem; color: #888;">(Optional)</span>
+                            </label>
+                            <input type="text" id="middle_name" name="middle_name" placeholder="e.g. Gomez" style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
                         </div>
                     </div>
 
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.75rem; border-top: 1px solid #f0f0f0; padding-top: 1.25rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div class="form-group">
+                            <label for="last_name" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                Last Name <span style="color: #C41E3A;">*</span>
+                            </label>
+                            <input type="text" id="last_name" name="last_name" placeholder="e.g. Santos" required style="width: 100%; padding: 0.8rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem;">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="birthday" style="font-weight: 700; color: #333; margin-bottom: 0.5rem; display: block;">
+                                Birthday <span style="color: #C41E3A;">*</span>
+                            </label>
+                            <input type="date" id="birthday" name="birthday" required style="width: 100%; padding: 0.75rem 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem; background-color: #fff;">
+                        </div>
+                    </div>
+
+                    <small style="display: block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #666; background: #fafafa; padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid #eee;">
+                        &#128273; The system will automatically generate a sequential <strong>FIPSXXX</strong> Login ID and a randomized 8-character temporary password.
+                    </small>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f0f0f0; padding-top: 1.25rem;">
                         <button type="button" class="btn btn-outline" onclick="closeStaffModal()">Cancel</button>
                         <button type="submit" class="btn btn-primary">&#10010; Generate Account & Credentials</button>
                     </div>
@@ -261,7 +280,7 @@
             var modal = document.getElementById('staffModal');
             modal.style.display = 'flex';
             setTimeout(function() {
-                var nameInput = document.getElementById('full_name');
+                var nameInput = document.getElementById('first_name');
                 if (nameInput) nameInput.focus();
             }, 100);
         }
